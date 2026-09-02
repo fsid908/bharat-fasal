@@ -222,22 +222,22 @@ export default function DashboardPage({ user }) {
   const quickActions = [
   {
     image: "/images/actions/new-lot.jpg",
-    label: "new lot",
+    label: "New Lot",
     path: "/lots",
   },
   {
     image: "/images/actions/find-buyer.jpg",
-    label: "find buyer",
+    label: "Find Buyer",
     path: "/buyers",
   },
   {
     image: "/images/actions/customer-complaint.jpg",
     label: "Complaint",
-    path: "/logistics",
+    path: "/disputes",
   },
   {
     image: "/images/actions/payment.jpg",
-    label: "track payment",
+    label: "Track Payment",
     path: "/payments",
   },
 ];
