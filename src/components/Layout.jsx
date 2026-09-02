@@ -1,19 +1,36 @@
-import { useLocation } from 'react-router-dom'
-import Navbar from './Navbar'
-import BottomNav from './BottomNav'
+import { useLocation } from "react-router-dom";
 
-export default function Layout({ children, onLogout }) {
-  const location = useLocation()
+import Navbar from "./Navbar";
+import BottomNav from "./BottomNav";
+import Footer from "./Footer";
+
+export default function Layout({
+  children,
+  onLogout,
+  user,
+}) {
+  const location = useLocation();
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <Navbar onLogout={onLogout} />
-      <main className="pb-20 md:pb-4 pt-16">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+    <div className="min-h-screen bg-gray-50 flex flex-col">
+
+      <Navbar
+        user={user}
+        onLogout={onLogout}
+      />
+
+      <main className="flex-1 pb-20 md:pb-4 pt-[76px]">
+
+        <div className="w-full">
           {children}
         </div>
+
       </main>
+
+      <Footer />
+
       <BottomNav />
+
     </div>
-  )
+  );
 }
