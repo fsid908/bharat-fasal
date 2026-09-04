@@ -1,18 +1,18 @@
-import i18n from 'i18next'
-import { initReactI18next } from 'react-i18next'
-import LanguageDetector from 'i18next-browser-languagedetector'
+import i18n from "i18next";
+import { initReactI18next } from "react-i18next";
+import LanguageDetector from "i18next-browser-languagedetector";
 
-import en from './locales/en.json'
-import hi from './locales/hi.json'
-import ur from './locales/ur.json'
-import ta from './locales/ta.json'
-import te from './locales/te.json'
-import bn from './locales/bn.json'
-import mr from './locales/mr.json'
-import gu from './locales/gu.json'
-import kn from './locales/kn.json'
-import pa from './locales/pa.json'
-import hinglish from './locales/hinglish.json'
+import en from "./locales/en.json";
+import hi from "./locales/hi.json";
+import ur from "./locales/ur.json";
+import ta from "./locales/ta.json";
+import te from "./locales/te.json";
+import bn from "./locales/bn.json";
+import mr from "./locales/mr.json";
+import gu from "./locales/gu.json";
+import kn from "./locales/kn.json";
+import pa from "./locales/pa.json";
+import hinglish from "./locales/hinglish.json";
 
 const resources = {
   en: { translation: en },
@@ -26,7 +26,7 @@ const resources = {
   kn: { translation: kn },
   pa: { translation: pa },
   hinglish: { translation: hinglish },
-}
+};
 
 i18n
   .use(LanguageDetector)
@@ -34,23 +34,38 @@ i18n
   .init({
     resources,
 
-    // Default language
-    lng: 'hi',
 
-    // If a translation is missing,
-    // Hindi will be used
-    fallbackLng: 'hi',
+    supportedLngs: [
+      "en",
+      "hi",
+      "ur",
+      "ta",
+      "te",
+      "bn",
+      "mr",
+      "gu",
+      "kn",
+      "pa",
+      "hinglish",
+    ],
+
+
+    fallbackLng: "hi",
 
     interpolation: {
       escapeValue: false,
     },
 
     detection: {
-      // Remember the language selected by the user
-      order: ['localStorage'],
 
-      caches: ['localStorage'],
+      order: ["localStorage"],
+
+  
+      caches: ["localStorage"],
+
+
+      lookupLocalStorage: "bf_language",
     },
   });
 
-export default i18n
+export default i18n;

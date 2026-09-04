@@ -16,7 +16,7 @@ const MarketPreview = () => {
       setError("");
 
       const response = await fetch(
-        "http://localhost:5000/api/mandi-prices?limit=4",
+        "/api/mandi-prices?limit=4",
         {
           headers: {
             Accept: "application/json",

@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { ChevronDown } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
-import { LANGUAGES } from "../utils/constants";
+import { LANGUAGES } from "../../utils/constants";
 
 const LandingNavbar = ({ onLogin }) => {
   const { t, i18n } = useTranslation();

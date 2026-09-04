@@ -17,6 +17,9 @@ import AdminPaymentsPage from "./pages/AdminPaymentsPage";
 import Layout from "./components/Layout";
 import LandingPage from "./pages/LandingPage";
 
+// Language Popup
+import LanguagePopup from "./components/landing/LanguagePopup";
+
 // Auth
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
@@ -41,13 +44,8 @@ import SettingsPage from "./pages/SettingsPage";
 
 function App() {
   const { i18n } = useTranslation();
-
   const navigate = useNavigate();
   const location = useLocation();
-
-  // --------------------------------
-  // APP STATE
-  // --------------------------------
 
   const [isLandingPage, setIsLandingPage] = useState(location.pathname === "/");
 
@@ -59,10 +57,14 @@ function App() {
 
   const [currentUser, setCurrentUser] = useState(null);
 
-  // --------------------------------
-  // LANGUAGE
-  // --------------------------------
+  // =====================================================
+  // LANGUAGE POPUP
+  // =====================================================
+  const [showLanguagePopup, setShowLanguagePopup] = useState(true);
 
+  // =====================================================
+  // LANGUAGE INITIALIZATION
+  // =====================================================
   useEffect(() => {
     const savedLanguage = localStorage.getItem("bf_language");
 
@@ -71,6 +73,9 @@ function App() {
     }
   }, [i18n]);
 
+  // =====================================================
+  // LANGUAGE DIRECTION
+  // =====================================================
   useEffect(() => {
     const lang = i18n.language || "en";
 
@@ -80,10 +85,9 @@ function App() {
     document.documentElement.setAttribute("lang", lang);
   }, [i18n.language]);
 
-  // --------------------------------
-  // HANDLE ROUTE CHANGES
-  // --------------------------------
-
+  // =====================================================
+  // LANDING PAGE CHECK
+  // =====================================================
   useEffect(() => {
     if (location.pathname === "/") {
       setIsLandingPage(true);
@@ -92,22 +96,23 @@ function App() {
     }
   }, [location.pathname]);
 
-  // --------------------------------
-  // LANDING PAGE
-  // --------------------------------
-
+  // =====================================================
+  // GET STARTED
+  // =====================================================
   const handleGetStarted = () => {
     navigate("/register");
   };
 
+  // =====================================================
+  // LANDING LOGIN
+  // =====================================================
   const handleLandingLogin = () => {
     navigate("/login");
   };
 
-  // --------------------------------
+  // =====================================================
   // LOGIN
-  // --------------------------------
-
+  // =====================================================
   const handleLogin = (role = "farmer", user = null) => {
     localStorage.setItem("bf_logged_in", "true");
     localStorage.setItem("bf_user_role", role);
@@ -119,10 +124,9 @@ function App() {
     navigate("/");
   };
 
-  // --------------------------------
+  // =====================================================
   // LOGOUT
-  // --------------------------------
-
+  // =====================================================
   const handleLogout = () => {
     localStorage.removeItem("bf_logged_in");
     localStorage.removeItem("bf_user_role");
@@ -134,53 +138,62 @@ function App() {
     navigate("/");
   };
 
-  // --------------------------------
-  // LANDING PAGE
-  // --------------------------------
+  // =====================================================
+  // LANGUAGE POPUP COMPLETE
+  // =====================================================
+  const handleLanguageComplete = () => {
+    setShowLanguagePopup(false);
+  };
 
+  // =====================================================
+  // PUBLIC LANDING PAGE + LANGUAGE POPUP
+  // =====================================================
   if (location.pathname === "/" && !isLoggedIn) {
     return (
-      <LandingPage
-        onGetStarted={handleGetStarted}
-        onLogin={handleLandingLogin}
-      />
+      <>
+        <LandingPage
+          onGetStarted={handleGetStarted}
+          onLogin={handleLandingLogin}
+        />
+
+        {showLanguagePopup && (
+          <LanguagePopup onComplete={handleLanguageComplete} />
+        )}
+      </>
     );
   }
 
-  // --------------------------------
-  // REGISTER PAGE
-  // --------------------------------
-
+  // =====================================================
+  // REGISTER
+  // =====================================================
   if (location.pathname === "/register" && !isLoggedIn) {
     return <RegisterPage />;
   }
 
-  // --------------------------------
-  // LOGIN PAGE
-  // --------------------------------
-
+  // =====================================================
+  // LOGIN
+  // =====================================================
   if (location.pathname === "/login" && !isLoggedIn) {
     return <LoginPage onLogin={handleLogin} />;
   }
 
-  // PUBLIC MANDI PRICES PAGE
-  
+  // =====================================================
+  // PUBLIC MANDI PRICES
+  // =====================================================
   if (location.pathname === "/prices" && !isLoggedIn) {
-  return <MandiPricesPage />;
-}
+    return <MandiPricesPage />;
+  }
 
-  // --------------------------------
-  // IF NOT LOGGED IN
-  // --------------------------------
-
+  // =====================================================
+  // NOT LOGGED IN
+  // =====================================================
   if (!isLoggedIn) {
     return <Navigate to="/" replace />;
   }
 
-  // --------------------------------
+  // =====================================================
   // DASHBOARD
-  // --------------------------------
-
+  // =====================================================
   const getDashboard = () => {
     switch (userRole) {
       case "admin":
@@ -198,10 +211,9 @@ function App() {
     }
   };
 
-  // --------------------------------
-  // AUTHENTICATED APP
-  // --------------------------------
-
+  // =====================================================
+  // AUTHENTICATED APPLICATION
+  // =====================================================
   return (
     <Layout onLogout={handleLogout} user={currentUser}>
       <Routes>
@@ -211,6 +223,7 @@ function App() {
         {/* Mandi Prices */}
         <Route path="/prices" element={<MandiPricesPage />} />
 
+        {/* Price Details */}
         <Route path="/prices/:commodityId" element={<PriceDetailPage />} />
 
         {/* Buyers */}
@@ -219,9 +232,10 @@ function App() {
           element={<BuyerMarketPage user={currentUser} />}
         />
 
-        {/* Lots */}
+        {/* Create Lot */}
         <Route path="/lots/create" element={<CreateLotPage />} />
 
+        {/* Lots */}
         <Route
           path="/lots"
           element={
