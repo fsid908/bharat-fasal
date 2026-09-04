@@ -33,12 +33,24 @@ i18n
   .use(initReactI18next)
   .init({
     resources,
+
+    // Default language
+    lng: 'hi',
+
+    // If a translation is missing,
+    // Hindi will be used
     fallbackLng: 'hi',
-    interpolation: { escapeValue: false },
+
+    interpolation: {
+      escapeValue: false,
+    },
+
     detection: {
-      order: ['localStorage', 'navigator'],
+      // Remember the language selected by the user
+      order: ['localStorage'],
+
       caches: ['localStorage'],
     },
-  })
+  });
 
 export default i18n

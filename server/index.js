@@ -5,9 +5,24 @@ import dotenv from "dotenv";
 dotenv.config();
 
 const app = express();
-const PORT = 5000;
 
-app.use(cors());
+const PORT = process.env.PORT || 5000;
+const DATA_GOV_API_KEY = process.env.DATA_GOV_API_KEY;
+
+const MANDI_RESOURCE_ID = "9ef84268-d588-465a-a308-a864a43d0070";
+
+const MANDI_API_URL = `https://api.data.gov.in/resource/${MANDI_RESOURCE_ID}`;
+
+// =====================================================
+// MIDDLEWARE
+// =====================================================
+
+app.use(
+  cors({
+    origin: process.env.FRONTEND_URL || "http://localhost:3000",
+  }),
+);
+
 app.use(express.json());
 
 // =====================================================
@@ -17,13 +32,10 @@ app.use(express.json());
 let mandiCache = null;
 let mandiCacheTime = 0;
 
-const CACHE_DURATION = 10 * 60 * 1000;
-
-// Crop image cache
-const cropImageCache = new Map();
+const CACHE_DURATION = 5 * 60 * 1000;
 
 // =====================================================
-// HELPER — CLEAN CROP NAME
+// HELPERS
 // =====================================================
 
 function cleanCropName(crop) {
@@ -35,9 +47,55 @@ function cleanCropName(crop) {
     .toLowerCase();
 }
 
+function toNumber(value) {
+  const number = Number(String(value || "").replace(/,/g, ""));
+
+  return Number.isFinite(number) ? number : null;
+}
+
+function normalizeMandiRecord(record) {
+  return {
+    state: record.state || "",
+    district: record.district || "",
+    market: record.market || "",
+    commodity: record.commodity || "",
+    variety: record.variety || "",
+    grade: record.grade || "",
+
+    arrivalDate: record.arrival_date || "",
+
+    minPrice: toNumber(record.min_price),
+    maxPrice: toNumber(record.max_price),
+    modalPrice: toNumber(record.modal_price),
+  };
+}
+
 // =====================================================
-// LOCAL CROP IMAGE MAP
+// FETCH WITH TIMEOUT
 // =====================================================
+
+async function fetchWithTimeout(url, options = {}, timeout = 10000) {
+  const controller = new AbortController();
+
+  const timer = setTimeout(() => {
+    controller.abort();
+  }, timeout);
+
+  try {
+    return await fetch(url, {
+      ...options,
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+// =====================================================
+// CROP IMAGE MAP
+// =====================================================
+
+const cropImageCache = new Map();
 
 function getLocalCropImage(crop) {
   const name = cleanCropName(crop);
@@ -78,10 +136,7 @@ app.get("/api/crop-image", async (req, res) => {
 
     const cacheKey = cleanCropName(crop);
 
-    // -----------------------------------------------
-    // RETURN CACHED IMAGE
-    // -----------------------------------------------
-
+    // CACHE
     if (cropImageCache.has(cacheKey)) {
       return res.json({
         success: true,
@@ -91,10 +146,7 @@ app.get("/api/crop-image", async (req, res) => {
       });
     }
 
-    // -----------------------------------------------
-    // CHECK LOCAL IMAGE FIRST
-    // -----------------------------------------------
-
+    // LOCAL IMAGE
     const localImage = getLocalCropImage(crop);
 
     if (localImage !== "/images/crops/default.jpg") {
@@ -108,45 +160,35 @@ app.get("/api/crop-image", async (req, res) => {
       });
     }
 
-    // -----------------------------------------------
-    // WIKIMEDIA COMMONS FALLBACK
-    // -----------------------------------------------
-
-    const searchQuery = encodeURIComponent(
-      `${crop} crop agriculture`
-    );
+    // WIKIMEDIA FALLBACK
+    const searchQuery = encodeURIComponent(`${crop} crop agriculture`);
 
     const wikiUrl =
-      `https://commons.wikimedia.org/w/api.php` +
-      `?action=query` +
-      `&generator=search` +
+      "https://commons.wikimedia.org/w/api.php" +
+      "?action=query" +
+      "&generator=search" +
       `&gsrsearch=${searchQuery}` +
-      `&gsrnamespace=6` +
-      `&gsrlimit=5` +
-      `&prop=imageinfo` +
-      `&iiprop=url` +
-      `&iiurlwidth=600` +
-      `&format=json` +
-      `&origin=*`;
+      "&gsrnamespace=6" +
+      "&gsrlimit=5" +
+      "&prop=imageinfo" +
+      "&iiprop=url" +
+      "&iiurlwidth=600" +
+      "&format=json" +
+      "&origin=*";
 
-    const response = await fetch(wikiUrl);
+    const response = await fetchWithTimeout(wikiUrl, {}, 8000);
 
     if (response.ok) {
       const data = await response.json();
 
-      const pages = data?.query?.pages
-        ? Object.values(data.query.pages)
-        : [];
+      const pages = data?.query?.pages ? Object.values(data.query.pages) : [];
 
       const imagePage = pages.find(
-        (page) =>
-          page?.imageinfo?.[0]?.thumburl ||
-          page?.imageinfo?.[0]?.url
+        (page) => page?.imageinfo?.[0]?.thumburl || page?.imageinfo?.[0]?.url,
       );
 
       const imageUrl =
-        imagePage?.imageinfo?.[0]?.thumburl ||
-        imagePage?.imageinfo?.[0]?.url;
+        imagePage?.imageinfo?.[0]?.thumburl || imagePage?.imageinfo?.[0]?.url;
 
       if (imageUrl) {
         cropImageCache.set(cacheKey, imageUrl);
@@ -160,10 +202,7 @@ app.get("/api/crop-image", async (req, res) => {
       }
     }
 
-    // -----------------------------------------------
     // FALLBACK
-    // -----------------------------------------------
-
     const fallback = "/images/crops/default.jpg";
 
     cropImageCache.set(cacheKey, fallback);
@@ -175,7 +214,7 @@ app.get("/api/crop-image", async (req, res) => {
       source: "fallback",
     });
   } catch (error) {
-    console.error("❌ Crop image error:", error);
+    console.error("Crop image error:", error.message);
 
     return res.json({
       success: true,
@@ -187,68 +226,80 @@ app.get("/api/crop-image", async (req, res) => {
 });
 
 // =====================================================
-// MANDI PRICES
+// MANDI PRICES API
 // =====================================================
 
 app.get("/api/mandi-prices", async (req, res) => {
   try {
-    // -----------------------------------------------
-    // RETURN CACHE
-    // -----------------------------------------------
-
-    if (
-      mandiCache &&
-      Date.now() - mandiCacheTime < CACHE_DURATION
-    ) {
-      console.log("✅ Returning cached mandi data");
-
-      return res.json(mandiCache);
-    }
-
-    const apiKey = process.env.DATA_GOV_API_KEY;
-
-    if (!apiKey) {
+    // API KEY CHECK
+    if (!DATA_GOV_API_KEY) {
       return res.status(500).json({
         success: false,
         message: "DATA_GOV_API_KEY is missing in .env",
       });
     }
 
-    // -----------------------------------------------
-    // GOVERNMENT API
-    // -----------------------------------------------
+    // LIMIT
+    const requestedLimit = Number(req.query.limit || 20);
 
-    const apiUrl =
-      "https://api.data.gov.in/resource/9ef84268-d588-465a-a308-a864a43d0070" +
-      `?api-key=${encodeURIComponent(apiKey)}` +
-      "&format=json" +
-      "&limit=20";
+    const limit = Math.min(Math.max(requestedLimit, 1), 100);
 
-    console.log("🌾 Calling Government Mandi API...");
+    // CACHE
+    if (mandiCache && Date.now() - mandiCacheTime < CACHE_DURATION) {
+      console.log("Returning cached mandi data");
 
-    const response = await fetch(apiUrl);
+      return res.json({
+        ...mandiCache,
+        cached: true,
+      });
+    }
+
+    // GOVERNMENT API REQUEST
+    const params = new URLSearchParams();
+
+    params.set("api-key", DATA_GOV_API_KEY);
+
+    params.set("format", "json");
+
+    params.set("offset", "0");
+
+    params.set("limit", "100");
+
+    const apiUrl = `${MANDI_API_URL}?${params.toString()}`;
+
+    console.log("======================================");
+
+    console.log("Calling Government Mandi API...");
+
+    console.log("======================================");
+
+    const response = await fetchWithTimeout(
+      apiUrl,
+      {
+        headers: {
+          Accept: "application/json",
+        },
+      },
+      15000,
+    );
 
     const text = await response.text();
 
-    console.log(
-      "Government API status:",
-      response.status
-    );
+    console.log("Government API status:", response.status);
 
-    // -----------------------------------------------
-    // API ERROR
-    // -----------------------------------------------
-
+    // GOVERNMENT API ERROR
     if (!response.ok) {
-      if (mandiCache) {
-        console.log(
-          "⚠️ Government API unavailable. Returning old cache."
-        );
+      console.error("======================================");
 
-        return res.json(mandiCache);
-      }
+      console.error("GOVERNMENT API ERROR");
 
-      return res.status(500).json({
+      console.error("Status:", response.status);
+
+      console.error("Response:", text);
+
+      console.error("======================================");
+
+      return res.status(502).json({
         success: false,
         message: "Government API request failed",
         governmentStatus: response.status,
@@ -256,50 +307,110 @@ app.get("/api/mandi-prices", async (req, res) => {
       });
     }
 
-    // -----------------------------------------------
     // PARSE RESPONSE
-    // -----------------------------------------------
+    let data;
 
-    const data = JSON.parse(text);
+    try {
+      data = JSON.parse(text);
+    } catch (error) {
+      throw new Error("Government API returned invalid JSON");
+    }
 
     if (!Array.isArray(data?.records)) {
-      throw new Error(
-        "Government API returned no records"
-      );
+      throw new Error("Government API returned no records");
     }
 
-    // -----------------------------------------------
-    // SAVE CACHE
-    // -----------------------------------------------
+    console.log("Records received:", data.records.length);
 
-    mandiCache = data;
+    // =================================================
+    // SORT BY ARRIVAL DATE
+    // =================================================
+
+    const sortedRecords = [...data.records].sort((a, b) => {
+      const dateA = String(a.arrival_date || "");
+
+      const dateB = String(b.arrival_date || "");
+
+      return dateB.localeCompare(dateA);
+    });
+
+    // =================================================
+    // LATEST REPORTING DATE
+    // =================================================
+
+    const latestReportingDate = sortedRecords[0]?.arrival_date || "";
+
+    console.log("Latest reporting date:", latestReportingDate);
+
+    // =================================================
+    // ONLY LATEST DATE RECORDS
+    // =================================================
+
+    const latestRecords = latestReportingDate
+      ? sortedRecords.filter(
+          (record) =>
+            String(record.arrival_date || "") === String(latestReportingDate),
+        )
+      : sortedRecords;
+
+    // =================================================
+    // NORMALIZE
+    // =================================================
+
+    const records = latestRecords
+      .map(normalizeMandiRecord)
+      .filter(
+        (record) =>
+          record.commodity && record.market && record.modalPrice !== null,
+      )
+      .slice(0, limit);
+
+    // =================================================
+    // RESULT
+    // =================================================
+
+    const result = {
+      success: true,
+
+      source: "Government of India - data.gov.in / AGMARKNET",
+
+      resourceId: MANDI_RESOURCE_ID,
+
+      fetchedAt: new Date().toISOString(),
+
+      latestReportingDate,
+
+      count: records.length,
+
+      records,
+    };
+
+    // SAVE CACHE
+    mandiCache = result;
+
     mandiCacheTime = Date.now();
 
-    console.log(
-      "✅ Fresh mandi data saved:",
-      data.records.length
-    );
+    console.log(`Fresh mandi data saved: ${records.length} records`);
 
-    return res.json(data);
+    console.log("Latest reporting date:", latestReportingDate);
+
+    // SEND RESPONSE
+    return res.json(result);
   } catch (error) {
-    console.error(
-      "❌ Mandi API error:",
-      error
-    );
+    console.error("Mandi API error:", error.message);
 
-    // -----------------------------------------------
-    // CACHE FALLBACK
-    // -----------------------------------------------
-
+    // STALE CACHE
     if (mandiCache) {
-      console.log(
-        "⚠️ Returning cached mandi data after error"
-      );
+      console.log("Returning stale cached data");
 
-      return res.json(mandiCache);
+      return res.json({
+        ...mandiCache,
+        cached: true,
+        stale: true,
+      });
     }
 
-    return res.status(500).json({
+    return res.status(503).json({
       success: false,
       message: "Unable to fetch mandi prices",
       error: error.message,
@@ -308,12 +419,20 @@ app.get("/api/mandi-prices", async (req, res) => {
 });
 
 // =====================================================
-// HOME
+// HEALTH CHECK
 // =====================================================
 
 app.get("/", (req, res) => {
   res.json({
+    success: true,
+
     message: "Bharat Fasal API is running 🌾",
+
+    services: {
+      mandiPrices: "/api/mandi-prices",
+
+      cropImage: "/api/crop-image",
+    },
   });
 });
 
@@ -322,7 +441,5 @@ app.get("/", (req, res) => {
 // =====================================================
 
 app.listen(PORT, () => {
-  console.log(
-    `🌾 Bharat Fasal API running on http://localhost:${PORT}`
-  );
+  console.log(`🌾 Bharat Fasal API running on http://localhost:${PORT}`);
 });
