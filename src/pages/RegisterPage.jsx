@@ -54,7 +54,7 @@ const states = [
   "Other",
 ];
 
-const RegisterPage = () => {
+const RegisterPage = ({ onLogin }) => {
   const navigate = useNavigate();
 
   const [formData, setFormData] = useState({
@@ -113,104 +113,127 @@ const RegisterPage = () => {
     setError("");
   };
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
+  const handleSubmit = async (e) => {
+  e.preventDefault();
 
-    const name = formData.name.trim();
-    const organizationName = formData.organizationName.trim();
+  const name = formData.name.trim();
+  const organizationName = formData.organizationName.trim();
+  const phone = formData.phone.trim();
+  const email = formData.email.trim();
+  const village = formData.village.trim();
+  const district = formData.district.trim();
+  const state = formData.state.trim();
+  const businessType = formData.businessType.trim();
 
-    // Name
-    if (!name) {
-      setError(
-        formData.role === "farmer"
-          ? "Please enter your full name."
-          : "Please enter the authorized person's name.",
-      );
+  // Existing validations
+  if (!name) {
+    setError("Please enter your name.");
+    return;
+  }
+
+  if (
+    (formData.role === "fpo" || formData.role === "buyer") &&
+    !organizationName
+  ) {
+    setError("Please enter your organization name.");
+    return;
+  }
+
+  if (!/^[6-9]\d{9}$/.test(phone)) {
+    setError("Please enter a valid 10-digit mobile number.");
+    return;
+  }
+
+  if (!district) {
+    setError("Please enter your district.");
+    return;
+  }
+
+  if (!state) {
+    setError("Please enter your state.");
+    return;
+  }
+
+  if (formData.role === "farmer" && !village) {
+    setError("Please enter your village.");
+    return;
+  }
+
+  if (formData.role === "buyer" && !businessType) {
+    setError("Please enter your business type.");
+    return;
+  }
+
+  if (formData.password.length < 6) {
+    setError("Password must be at least 6 characters.");
+    return;
+  }
+
+  if (formData.password !== formData.confirmPassword) {
+    setError("Passwords do not match.");
+    return;
+  }
+
+  if (!agreeTerms) {
+    setError("Please accept the terms and conditions.");
+    return;
+  }
+
+  setError("");
+
+  try {
+    // Send registration data to backend
+    const response = await fetch("http://localhost:5000/api/auth/register", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        role: formData.role,
+        name,
+        organizationName,
+        phone,
+        email,
+        village,
+        district,
+        state,
+        businessType,
+        password: formData.password,
+        agreeTerms,
+      }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok || !data.success) {
+      setError(data.message || "Registration failed.");
       return;
     }
 
-    if (!/^[A-Za-zÀ-ÖØ-öø-ÿ\s]+$/.test(name)) {
-      setError("Name can contain only letters and spaces.");
-      return;
-    }
-
-    // Organization
-    if (
-      (formData.role === "fpo" || formData.role === "buyer") &&
-      !organizationName
-    ) {
-      setError(
-        formData.role === "fpo"
-          ? "Please enter your FPO / organization name."
-          : "Please enter your business / organization name.",
-      );
-      return;
-    }
-
-    // Mobile
-    if (!/^[0-9]{10}$/.test(formData.phone)) {
-      setError("Please enter a valid 10-digit mobile number.");
-      return;
-    }
-
-    // District
-    if (!formData.district.trim()) {
-      setError("Please enter your district.");
-      return;
-    }
-
-    // State
-    if (!formData.state) {
-      setError("Please select your state.");
-      return;
-    }
-
-    // Farmer village
-    if (formData.role === "farmer" && !formData.village.trim()) {
-      setError("Please enter your village / town.");
-      return;
-    }
-
-    // Buyer business type
-    if (formData.role === "buyer" && !formData.businessType.trim()) {
-      setError("Please enter your business type.");
-      return;
-    }
-
-    // Password
-    if (formData.password.length < 6) {
-      setError("Password must be at least 6 characters.");
-      return;
-    }
-
-    if (formData.password !== formData.confirmPassword) {
-      setError("Passwords do not match.");
-      return;
-    }
-
-    // Terms
-    if (!agreeTerms) {
-      setError("Please accept the Terms & Conditions.");
-      return;
-    }
-
-    // Save registration data
+    // Keep existing frontend flow
     const user = {
-      role: formData.role,
-      name,
-      organizationName,
-      phone: formData.phone,
-      email: formData.email.trim(),
-      village: formData.village.trim(),
-      district: formData.district.trim(),
-      state: formData.state,
-      businessType: formData.businessType.trim(),
+      id: data.user.id,
+      role: data.user.role,
+      name: data.user.name,
+      organizationName: data.user.organizationName || "",
+      phone: data.user.mobile,
+      email: data.user.email || "",
+      village: data.user.village || "",
+      district: data.user.district || "",
+      state: data.user.state || "",
+      businessType: data.user.businessType || "",
     };
 
+    // Temporary compatibility with existing frontend
     localStorage.setItem("bf_registered_user", JSON.stringify(user));
 
-    navigate("/verification");
-  };
+    onLogin(user.role, user);
+
+  } catch (error) {
+    console.error("Registration error:", error);
+    setError("Unable to connect to server. Please try again.");
+  }
+};
 
   return (
     <div className="relative min-h-screen overflow-hidden">

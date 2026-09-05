@@ -16,7 +16,7 @@ const MarketPreview = () => {
       setError("");
 
       const response = await fetch(
-        "/api/mandi-prices?limit=4",
+        "/api/mandi-prices?limit=6",
         {
           headers: {
             Accept: "application/json",
@@ -46,7 +46,7 @@ const MarketPreview = () => {
             item.modalPrice !== null &&
             item.modalPrice !== undefined
         )
-        .slice(0, 4);
+        .slice(0, 6);
 
       setMarketPrices(records);
     } catch (err) {
@@ -124,6 +124,8 @@ const MarketPreview = () => {
     return dateString;
   };
 
+
+    return null;
   return (
     <section className="bg-white py-16 sm:py-20">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
