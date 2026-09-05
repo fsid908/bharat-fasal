@@ -1,0 +1,218 @@
+{
+  "created": 1627939168,
+  "updated": 1788563235,
+  "created_date": "2021-08-02T21:19:28Z",
+  "updated_date": "2026-09-04T23:07:15Z",
+  "active": "1",
+  "index_name": "9ef84268-d588-465a-a308-a864a43d0070",
+  "org": [
+    "Ministry of Agriculture and Farmers Welfare",
+    "Department of Agriculture and Farmers Welfare"
+  ],
+  "org_type": "Central",
+  "source": "data.gov.in",
+  "title": "Current Daily Price of Various Commodities from Various Markets (Mandi)",
+  "external_ws_url": "",
+  "visualizable": "1",
+  "field": [
+    {
+      "name": "State",
+      "id": "state",
+      "type": "keyword"
+    },
+    {
+      "name": "District",
+      "id": "district",
+      "type": "keyword"
+    },
+    {
+      "name": "Market",
+      "id": "market",
+      "type": "keyword"
+    },
+    {
+      "name": "Commodity",
+      "id": "commodity",
+      "type": "keyword"
+    },
+    {
+      "name": "Variety",
+      "id": "variety",
+      "type": "keyword"
+    },
+    {
+      "name": "Grade",
+      "id": "grade",
+      "type": "keyword"
+    },
+    {
+      "name": "Arrival_Date",
+      "id": "arrival_date",
+      "type": "date"
+    },
+    {
+      "name": "Min_x0020_Price",
+      "id": "min_price",
+      "type": "double"
+    },
+    {
+      "name": "Max_x0020_Price",
+      "id": "max_price",
+      "type": "double"
+    },
+    {
+      "name": "Modal_x0020_Price",
+      "id": "modal_price",
+      "type": "double"
+    }
+  ],
+  "external_ws": 0,
+  "catalog_uuid": "6141ea17-a69d-4713-b600-0a43c8fd9a6c",
+  "sector": [
+    "Agriculture",
+    "Agricultural Marketing"
+  ],
+  "target_bucket": {
+    "field": "9ef84268-d588-465a-a308-a864a43d0070",
+    "index": "daily_mandi_price",
+    "type": "6141ea17-a69d-4713-b600-0a43c8fd9a6c"
+  },
+  "desc": "Current Daily Price of Various Commodities from Various Markets (Mandi)",
+  "field_exposed": [
+    {
+      "name": "State",
+      "id": "state.keyword",
+      "type": "keyword"
+    },
+    {
+      "name": "District",
+      "id": "district",
+      "type": "keyword"
+    },
+    {
+      "name": "Market",
+      "id": "market",
+      "type": "keyword"
+    },
+    {
+      "name": "Commodity",
+      "id": "commodity",
+      "type": "keyword"
+    },
+    {
+      "name": "Variety",
+      "id": "variety",
+      "type": "keyword"
+    },
+    {
+      "name": "Grade",
+      "id": "grade",
+      "type": "keyword"
+    }
+  ],
+  "message": "Resource lists",
+  "version": "2.2.0",
+  "status": "ok",
+  "total": 12599,
+  "count": 6,
+  "limit": "6",
+  "offset": "0",
+  "records": [
+    {
+      "state": "Andhra Pradesh",
+      "district": "Prakasam",
+      "market": "Santhamaguluru APMC",
+      "commodity": "Maize",
+      "variety": "Hybrid",
+      "grade": "FAQ",
+      "arrival_date": "04/09/2026",
+      "min_price": 2400,
+      "max_price": 2480,
+      "modal_price": 2450,
+      "minPrice": 2400,
+      "maxPrice": 2480,
+      "modalPrice": 2450,
+      "arrivalDate": "04/09/2026"
+    },
+    {
+      "state": "Madhya Pradesh",
+      "district": "Sidhi",
+      "market": "Sidhi APMC",
+      "commodity": "Wheat",
+      "variety": "Mill Quality",
+      "grade": "Non-FAQ",
+      "arrival_date": "04/09/2026",
+      "min_price": 2350,
+      "max_price": 2420,
+      "modal_price": 2400,
+      "minPrice": 2350,
+      "maxPrice": 2420,
+      "modalPrice": 2400,
+      "arrivalDate": "04/09/2026"
+    },
+    {
+      "state": "Keralam",
+      "district": "Alappuzha",
+      "market": "Cherthala Market",
+      "commodity": "Beetroot",
+      "variety": "Beetroot",
+      "grade": "FAQ",
+      "arrival_date": "04/09/2026",
+      "min_price": 5200,
+      "max_price": 5500,
+      "modal_price": 5300,
+      "minPrice": 5200,
+      "maxPrice": 5500,
+      "modalPrice": 5300,
+      "arrivalDate": "04/09/2026"
+    },
+    {
+      "state": "Keralam",
+      "district": "Kozhikode(Calicut)",
+      "market": "Palayam Market",
+      "commodity": "Amaranthus",
+      "variety": "Amaranthus",
+      "grade": "Local",
+      "arrival_date": "04/09/2026",
+      "min_price": 2800,
+      "max_price": 2800,
+      "modal_price": 2800,
+      "minPrice": 2800,
+      "maxPrice": 2800,
+      "modalPrice": 2800,
+      "arrivalDate": "04/09/2026"
+    },
+    {
+      "state": "Keralam",
+      "district": "Palakad",
+      "market": "Kollengode Market",
+      "commodity": "Snakeguard",
+      "variety": "Snakeguard",
+      "grade": "FAQ",
+      "arrival_date": "04/09/2026",
+      "min_price": 2000,
+      "max_price": 2400,
+      "modal_price": 2200,
+      "minPrice": 2000,
+      "maxPrice": 2400,
+      "modalPrice": 2200,
+      "arrivalDate": "04/09/2026"
+    },
+    {
+      "state": "Keralam",
+      "district": "Palakad",
+      "market": "Kollengode Market",
+      "commodity": "Potato",
+      "variety": "Potato",
+      "grade": "FAQ",
+      "arrival_date": "04/09/2026",
+      "min_price": 4000,
+      "max_price": 4400,
+      "modal_price": 4200,
+      "minPrice": 4000,
+      "maxPrice": 4400,
+      "modalPrice": 4200,
+      "arrivalDate": "04/09/2026"
+    }
+  ]
+}
