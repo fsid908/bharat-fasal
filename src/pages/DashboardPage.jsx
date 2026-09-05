@@ -345,7 +345,7 @@ export default function DashboardPage({ user }) {
   useEffect(() => {
     const fetchMandiPrices = async () => {
       try {
-        const response = await fetch("http://localhost:5000/api/mandi-prices");
+        const response = await fetch("https://bharat-fasal.onrender.com/api/mandi-prices");
 
         if (!response.ok) {
           throw new Error(`Mandi API error: ${response.status}`);
