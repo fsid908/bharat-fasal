@@ -14,7 +14,7 @@ const localCropImages = {
 
   rice: "/images/crops/rice.jpg",
   
-  tomato: "/images/crops/tomato.jpeg",
+  tomato: "/images/crops/tomato.jpg",
   paddy: "/images/crops/rice.jpg",
 
   cotton: "/images/crops/cotton.jpg",
@@ -31,8 +31,7 @@ const localCropImages = {
   turmeric: "/images/crops/turmeric.jpg",
   cucumber: "/images/crops/cucumber.jpg",
 
-  soybean: "/images/crops/default.jpg",
-  soyabean: "/images/crops/default.jpg",
+  soyabean: "/images/crops/soyabean.jpg",
 };
 
 
