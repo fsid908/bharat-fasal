@@ -196,7 +196,7 @@ export default function PriceCard({ price }) {
         setImageLoading(true);
 
         const response = await fetch(
-          `http://localhost:5000/api/crop-image?crop=${encodeURIComponent(
+          `https://bharat-fasal.onrender.com/api/crop-image?crop=${encodeURIComponent(
             commodity
           )}`
         );

@@ -166,7 +166,7 @@ export default function MandiPricesPage() {
       setError("");
 
       const response = await fetch(
-        "http://localhost:5000/api/mandi-prices",
+        "https://bharat-fasal.onrender.com/api/mandi-prices",
         {
           method: "GET",
           headers: {

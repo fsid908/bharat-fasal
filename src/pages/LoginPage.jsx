@@ -96,7 +96,7 @@ export default function LoginPage({ onLogin }) {
   }
 
   try {
-    const response = await fetch("http://localhost:5000/api/auth/login", {
+    const response = await fetch("https://bharat-fasal.onrender.com/api/auth/login", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -155,7 +155,7 @@ export default function LoginPage({ onLogin }) {
 
   try {
     const response = await fetch(
-      "http://localhost:5000/api/auth/forgot-password/send-otp",
+      "https://bharat-fasal.onrender.com/api/auth/forgot-password/send-otp",
       {
         method: "POST",
         headers: {
@@ -202,7 +202,7 @@ export default function LoginPage({ onLogin }) {
   try {
     // First verify OTP
     const verifyResponse = await fetch(
-      "http://localhost:5000/api/auth/forgot-password/verify-otp",
+      "https://bharat-fasal.onrender.com/api/auth/forgot-password/verify-otp",
       {
         method: "POST",
         headers: {
@@ -224,7 +224,7 @@ export default function LoginPage({ onLogin }) {
 
     // Reset password
     const resetResponse = await fetch(
-      "http://localhost:5000/api/auth/forgot-password/reset",
+      "https://bharat-fasal.onrender.com/api/auth/forgot-password/reset",
       {
         method: "POST",
         headers: {
