@@ -28,8 +28,8 @@ const localCropImages = {
   chickpea: "/images/crops/chickpea.jpg",
   chana: "/images/crops/chickpea.jpg",
 
-  turmeric: "/images/crops/turmeric.jpeg",
-  cucumber: "/images/crops/cucumber.jpeg",
+  turmeric: "/images/crops/turmeric.jpg",
+  cucumber: "/images/crops/cucumber.jpg",
 
   soybean: "/images/crops/default.jpg",
   soyabean: "/images/crops/default.jpg",
