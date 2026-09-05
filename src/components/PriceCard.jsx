@@ -21,7 +21,7 @@ const localCropImages = {
 
   potato: "/images/crops/potato.jpg",
   brinjal: "/images/crops/brinjal.jpg",
-  cucumber: "/images/crops/cucumber.jpg",
+ 
   grapes: "/images/crops/grapes.jpg",
   snakeguard: "/images/crops/snakegaurd.jpg",
 
