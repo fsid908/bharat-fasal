@@ -428,7 +428,6 @@ export default function MandiPricesPage() {
   // UI
   // ===================================================
 
-  return null;
   return (
     <div className="w-full min-h-screen bg-gray-50">
       <div

@@ -13,16 +13,23 @@ const localCropImages = {
   wheat: "/images/crops/wheat.jpg",
 
   rice: "/images/crops/rice.jpg",
+  
+  tomato: "/images/crops/tomato.jpeg",
   paddy: "/images/crops/rice.jpg",
 
-  tomato: "/images/crops/tomato.jpeg",
-
   cotton: "/images/crops/cotton.jpg",
+
+  potato: "/images/crops/potato.jpg",
+  brinjal: "/images/crops/brinjal.jpg",
+  cucumber: "/images/crops/cucumber.jpg",
+  grapes: "/images/crops/grapes.jpg",
+  snakeguard: "/images/crops/snakegaurd.jpg",
 
   chickpea: "/images/crops/chickpea.jpg",
   chana: "/images/crops/chickpea.jpg",
 
   turmeric: "/images/crops/turmeric.jpeg",
+  cucumber: "/images/crops/cucumber.jpeg",
 
   soybean: "/images/crops/default.jpg",
   soyabean: "/images/crops/default.jpg",

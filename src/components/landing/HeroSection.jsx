@@ -57,7 +57,6 @@ const HeroSection = ({ onGetStarted }) => {
         (prev - 1 + slides.length) % slides.length
     );
   };
-return null;
   return (
     <section
       id="home"
