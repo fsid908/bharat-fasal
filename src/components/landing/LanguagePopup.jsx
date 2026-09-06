@@ -34,6 +34,13 @@ const speechMessages = {
 };
 
 const LanguagePopup = ({ onComplete }) => {
+    useEffect(() => {
+    document.body.style.overflow = "hidden";
+
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, []);
   const { i18n } = useTranslation();
 
   const [selected, setSelected] = useState(i18n.language || "en");
@@ -131,8 +138,8 @@ const LanguagePopup = ({ onComplete }) => {
   };
 
  return (
-  <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/35 px-4">
-    <div className="w-full max-w-sm rounded-xl border border-white/50 bg-white/90 px-5 py-5 shadow-xl backdrop-blur-md">
+  <div className="fixed inset-0 z-[100] flex items-start justify-center overflow-y-auto bg-black/35 px-4 py-4 sm:items-center">
+    <div className="w-full max-w-sm max-h-[calc(100vh-2rem)] overflow-y-auto rounded-xl border border-white/50 bg-white/90 px-5 py-5 shadow-xl backdrop-blur-md">
 
       {/* Logo & Heading */}
       <div className="text-center">
