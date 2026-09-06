@@ -16,13 +16,13 @@ const MarketPreview = () => {
       setError("");
 
       const response = await fetch(
-        "/api/mandi-prices?limit=6",
-        {
-          headers: {
-            Accept: "application/json",
-          },
-        }
-      );
+  "https://bharat-fasal.onrender.com/api/mandi-prices?limit=6",
+  {
+    headers: {
+      Accept: "application/json",
+    },
+  }
+);
 
       if (!response.ok) {
         throw new Error(
