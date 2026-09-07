@@ -20,6 +20,12 @@
 ## 🖥️ Project Preview
 
 <p align="center">
+  <img src="screenshots/landing-dashboard.png" alt="Landing Dashboard" width="900">
+</p>
+
+<p align="center"><b>Landing Page Dashboard</b></p>
+
+<p align="center">
   <img src="screenshots/login-dashboard.png" alt="Login Dashboard" width="900">
 </p>
 
@@ -43,7 +49,6 @@
 </p>
 
 <p align="center"><b>Admin Dashboard</b></p>
-
 ---
 
 ## 📌 About
