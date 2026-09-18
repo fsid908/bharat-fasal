@@ -10,7 +10,7 @@ const createAdmin = async () => {
     await mongoose.connect(process.env.MONGODB_URI);
 
     const mobile = "9000000000";
-    const password = "Admin@123";
+    const password = "Sidd@123";
 
     const existingAdmin = await User.findOne({
       mobile,
@@ -31,7 +31,7 @@ const createAdmin = async () => {
       name: "Bharat Fasal Admin",
       mobile,
       email: "admin@bharatfasal.com",
-      district: "Gorakhpur",
+      district: "Maharajganj",
       state: "Uttar Pradesh",
       passwordHash,
       termsAccepted: true,
