@@ -1645,14 +1645,16 @@ export default function SettingsPage({ onLogout, user }) {
                 </p>
               </div>
 
-              <button
-                type="button"
-                onClick={submitVerification}
-                className="w-full py-3 rounded-lg bg-green-600 hover:bg-green-700 text-white text-sm font-semibold flex items-center justify-center gap-2 transition"
-              >
-                <ShieldCheck size={17} />
-                Submit for Verification
-              </button>
+              {!isVerificationPending && (
+  <button
+    type="button"
+    onClick={submitVerification}
+    className="w-full py-3 rounded-lg bg-green-600 hover:bg-green-700 text-white text-sm font-semibold flex items-center justify-center gap-2 transition"
+  >
+    <ShieldCheck size={17} />
+    Submit for Verification
+  </button>
+)}
             </div>
           )}
         </Modal>

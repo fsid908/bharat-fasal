@@ -1,16 +1,31 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
-  Settings, User, Sprout, MapPin, Phone, ShieldCheck, Landmark,
-  WalletCards, Bell, BarChart3, MessageCircle, Globe, ChevronRight,
-  CircleHelp, Mail, Info, LogOut, Leaf, Truck
+  Settings,
+  User,
+  Sprout,
+  MapPin,
+  Phone,
+  ShieldCheck,
+  Landmark,
+  WalletCards,
+  Bell,
+  BarChart3,
+  MessageCircle,
+  Globe,
+  ChevronRight,
+  CircleHelp,
+  Mail,
+  Info,
+  LogOut,
+  Leaf,
+  Truck,
 } from "lucide-react";
 import SettingsLanguageSelector from "../components/SettingsLanguageSelector";
 
-const VERIFICATION_API =
-  "https://bharat-fasal.onrender.com/api/verification/farmer";
-const VERIFICATION_STATUS_API =
-  "https://bharat-fasal.onrender.com/api/verification/me";
+const API = "https://bharat-fasal.onrender.com/api/verification";
+const TOKEN_KEY = "bf_auth_token";
+const STATUS_KEY = "bf_verification_status";
 
 const cardClass =
   "bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden";
@@ -18,7 +33,16 @@ const cardClass =
 const inputClass =
   "w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-100 focus:border-green-500";
 
-const getToken = () => localStorage.getItem("bf_auth_token");
+const getToken = () => localStorage.getItem(TOKEN_KEY);
+
+const normalizeStatus = (status) => {
+  if (status === "approved" || status === "verified") return "verified";
+  return status || "not_verified";
+};
+
+/* =========================
+   REUSABLE COMPONENTS
+========================= */
 
 function Card({ icon: Icon, color = "green", title, subtitle, children }) {
   const colors = {
@@ -33,14 +57,18 @@ function Card({ icon: Icon, color = "green", title, subtitle, children }) {
   return (
     <section className={cardClass}>
       <div className="px-5 py-4 border-b border-gray-100 flex items-center gap-3">
-        <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${colors[color]}`}>
+        <div
+          className={`w-9 h-9 rounded-lg flex items-center justify-center ${colors[color]}`}
+        >
           <Icon size={19} />
         </div>
+
         <div>
           <h2 className="font-bold text-gray-900">{title}</h2>
           <p className="text-xs text-gray-500 mt-0.5">{subtitle}</p>
         </div>
       </div>
+
       {children}
     </section>
   );
@@ -55,6 +83,7 @@ function Modal({ title, subtitle, onClose, children, className = "max-w-md" }) {
             <h3 className="font-bold text-gray-900">{title}</h3>
             <p className="text-xs text-gray-500 mt-0.5">{subtitle}</p>
           </div>
+
           <button
             type="button"
             onClick={onClose}
@@ -64,6 +93,7 @@ function Modal({ title, subtitle, onClose, children, className = "max-w-md" }) {
             ×
           </button>
         </div>
+
         {children}
       </div>
     </div>
@@ -92,33 +122,56 @@ function PaymentRow({ icon: Icon, title, subtitle, onClick, border = true }) {
     >
       <div className="flex items-center gap-3">
         <Icon size={18} className="text-gray-500" />
+
         <div>
           <p className="text-sm font-semibold text-gray-800">{title}</p>
           <p className="text-xs text-gray-500 mt-0.5">{subtitle}</p>
         </div>
       </div>
+
       <ChevronRight size={17} className="text-gray-400" />
     </button>
   );
 }
 
-function Status({ status, onVerify }) {
-  if (status === "verified")
+function VerificationStatus({ status, onVerify, compact = false }) {
+  if (status === "verified") {
     return (
-      <span className="inline-flex items-center gap-1 text-xs font-semibold text-green-700">
-        <ShieldCheck size={13} /> Verified Farmer
+      <span
+        className={`${
+          compact ? "shrink-0" : "inline-flex"
+        } items-center gap-1 text-xs font-semibold text-green-600`}
+      >
+        <ShieldCheck size={compact ? 14 : 13} />
+        Verified{compact ? "" : " Farmer"}
       </span>
     );
+  }
 
-  if (status === "pending")
+  if (status === "pending") {
     return (
-      <span className="inline-flex items-center gap-1 text-xs font-semibold text-amber-600">
-        <ShieldCheck size={13} /> Verification Pending
+      <span
+        className={`${
+          compact ? "shrink-0" : "inline-flex"
+        } items-center gap-1 text-xs font-semibold text-amber-600`}
+      >
+        {compact ? "Pending" : "Verification Pending"}
       </span>
     );
+  }
 
-  if (status === "rejected")
-    return <span className="text-xs font-semibold text-red-600">Verification Rejected</span>;
+  if (status === "rejected") {
+    return (
+      <button
+        type="button"
+        onClick={onVerify}
+        className="shrink-0 text-xs font-semibold text-red-600"
+      >
+        Re-verify
+        <ChevronRight size={13} className="inline ml-1" />
+      </button>
+    );
+  }
 
   return (
     <button
@@ -126,32 +179,8 @@ function Status({ status, onVerify }) {
       onClick={onVerify}
       className="inline-flex items-center gap-1 text-xs font-semibold text-green-700 hover:text-green-800"
     >
-      Verify your identity <ChevronRight size={13} />
-    </button>
-  );
-}
-
-function VerificationAction({ status, onVerify }) {
-  if (status === "verified")
-    return (
-      <span className="shrink-0 text-xs font-semibold text-green-600 flex items-center gap-1">
-        <ShieldCheck size={14} /> Verified
-      </span>
-    );
-
-  if (status === "pending")
-    return <span className="shrink-0 text-xs font-semibold text-amber-600">Pending</span>;
-
-  return (
-    <button
-      type="button"
-      onClick={onVerify}
-      className={`shrink-0 text-xs font-semibold ${
-        status === "rejected" ? "text-red-600" : "text-green-700"
-      }`}
-    >
-      {status === "rejected" ? "Re-verify" : "Verify Now"}
-      <ChevronRight size={13} className="inline ml-1" />
+      {compact ? "Verify Now" : "Verify your identity"}
+      <ChevronRight size={13} />
     </button>
   );
 }
@@ -177,6 +206,7 @@ function Field({ label, value, onChange, placeholder, type = "text" }) {
       <label className="block text-xs font-semibold text-gray-600 mb-1">
         {label}
       </label>
+
       <input
         type={type}
         value={value}
@@ -188,6 +218,26 @@ function Field({ label, value, onChange, placeholder, type = "text" }) {
     </div>
   );
 }
+
+/* =========================
+   STATIC DATA
+========================= */
+
+const notificationItems = [
+  ["prices", "Market Price Alerts", BarChart3],
+  ["buyers", "Buyer Messages", MessageCircle],
+  ["payments", "Payment Updates", WalletCards],
+];
+
+const farmItems = [
+  ["Main Crops", "Wheat, Rice, Maize"],
+  ["Typical Lot Size", "50–200 Quintals"],
+  ["Preferred Quality", "A / Premium"],
+];
+
+/* =========================
+   PAGE
+========================= */
 
 export default function FarmerSettingsPage({ user, onLogout }) {
   const { t, i18n } = useTranslation();
@@ -204,8 +254,8 @@ export default function FarmerSettingsPage({ user, onLogout }) {
     payments: true,
   });
 
-  const [verificationStatus, setVerificationStatus] = useState(
-    () => localStorage.getItem("bf_verification_status") || "not_verified"
+  const [verificationStatus, setVerificationStatus] = useState(() =>
+    normalizeStatus(localStorage.getItem(STATUS_KEY)),
   );
 
   const [verificationForm, setVerificationForm] = useState({
@@ -214,24 +264,37 @@ export default function FarmerSettingsPage({ user, onLogout }) {
     idReference: "",
   });
 
+  /* =========================
+     LOAD VERIFICATION STATUS
+  ========================= */
+
   useEffect(() => {
     const loadVerification = async () => {
       const token = getToken();
-      if (!token) return;
+
+      if (!token) {
+        setVerificationStatus("not_verified");
+        return;
+      }
 
       try {
-        const response = await fetch(VERIFICATION_STATUS_API, {
-          headers: { Authorization: `Bearer ${token}` },
+        const response = await fetch(`${API}/me`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
         });
 
         if (!response.ok) return;
 
         const data = await response.json();
-        const status = data.verification?.status;
+        const status = normalizeStatus(data.verification?.status);
 
-        if (status) {
-          setVerificationStatus(status);
-          localStorage.setItem("bf_verification_status", status);
+        setVerificationStatus(status);
+
+        if (data.verification) {
+          localStorage.setItem(STATUS_KEY, status);
+        } else {
+          localStorage.removeItem(STATUS_KEY);
         }
       } catch (error) {
         console.error("Verification status error:", error);
@@ -241,23 +304,39 @@ export default function FarmerSettingsPage({ user, onLogout }) {
     loadVerification();
   }, []);
 
-  const updateForm = (key, value) =>
-    setVerificationForm((prev) => ({ ...prev, [key]: value }));
+  /* =========================
+     HANDLERS
+  ========================= */
+
+  const updateForm = (key, value) => {
+    setVerificationForm((prev) => ({
+      ...prev,
+      [key]: value,
+    }));
+  };
 
   const handleVerificationSubmit = async (e) => {
     e.preventDefault();
 
     const { fullName, idType, idReference } = verificationForm;
+
     if (!fullName.trim() || !idType || !idReference.trim()) return;
+
+    const token = getToken();
+
+    if (!token) {
+      alert("Please login again.");
+      return;
+    }
 
     setSubmitting(true);
 
     try {
-      const response = await fetch(VERIFICATION_API, {
+      const response = await fetch(`${API}/farmer`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${getToken()}`,
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
           fullName: fullName.trim(),
@@ -268,14 +347,14 @@ export default function FarmerSettingsPage({ user, onLogout }) {
 
       const data = await response.json();
 
-      if (!response.ok)
-        throw new Error(data.message || "Verification failed");
+      if (!response.ok) {
+        throw new Error(data.message || "Unable to submit verification");
+      }
 
-      setVerificationStatus(data.verification?.status || "pending");
-      localStorage.setItem(
-        "bf_verification_status",
-        data.verification?.status || "pending"
-      );
+      const status = normalizeStatus(data.verification?.status || "pending");
+
+      setVerificationStatus(status);
+      localStorage.setItem(STATUS_KEY, status);
       setShowVerification(false);
     } catch (error) {
       console.error("Farmer verification error:", error);
@@ -285,8 +364,12 @@ export default function FarmerSettingsPage({ user, onLogout }) {
     }
   };
 
-  const toggleNotification = (key) =>
-    setNotifications((prev) => ({ ...prev, [key]: !prev[key] }));
+  const toggleNotification = (key) => {
+    setNotifications((prev) => ({
+      ...prev,
+      [key]: !prev[key],
+    }));
+  };
 
   const handleLanguageChange = (lang) => {
     i18n.changeLanguage(lang);
@@ -294,33 +377,24 @@ export default function FarmerSettingsPage({ user, onLogout }) {
     document.documentElement.setAttribute("lang", lang);
   };
 
-  const verify = () => setShowVerification(true);
-
-  const notificationItems = [
-    ["prices", "Market Price Alerts", BarChart3],
-    ["buyers", "Buyer Messages", MessageCircle],
-    ["payments", "Payment Updates", WalletCards],
-  ];
-
-  const farmItems = [
-    ["Main Crops", "Wheat, Rice, Maize"],
-    ["Typical Lot Size", "50–200 Quintals"],
-    ["Preferred Quality", "A / Premium"],
-  ];
+  const openVerification = () => {
+    setShowVerification(true);
+  };
 
   return (
     <div className="w-full min-h-screen bg-gray-50">
       <div className="w-full max-w-[1500px] mx-auto px-4 sm:px-6 lg:px-8 py-6">
-
         {/* HEADER */}
         <div className="mb-6 flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-green-100 text-green-600 flex items-center justify-center">
             <Settings size={22} />
           </div>
+
           <div>
             <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
               {t("settings")}
             </h1>
+
             <p className="text-sm text-gray-500 mt-0.5">
               Manage your farmer account and preferences
             </p>
@@ -328,7 +402,6 @@ export default function FarmerSettingsPage({ user, onLogout }) {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-start">
-
           {/* FARMER PROFILE */}
           <Card
             icon={User}
@@ -338,7 +411,11 @@ export default function FarmerSettingsPage({ user, onLogout }) {
             <div className="p-5">
               <div className="flex items-center gap-5">
                 <div className="w-20 h-20 rounded-2xl bg-green-50 border border-green-100 flex items-center justify-center shrink-0">
-                  <User size={38} strokeWidth={1.8} className="text-green-600" />
+                  <User
+                    size={38}
+                    strokeWidth={1.8}
+                    className="text-green-600"
+                  />
                 </div>
 
                 <div className="min-w-0">
@@ -347,21 +424,27 @@ export default function FarmerSettingsPage({ user, onLogout }) {
                   </h3>
 
                   <div className="mt-1.5">
-                    <Status status={verificationStatus} onVerify={verify} />
+                    <VerificationStatus
+                      status={verificationStatus}
+                      onVerify={openVerification}
+                    />
                   </div>
 
                   {user?.phone && (
                     <p className="flex items-center gap-2 text-sm text-gray-500 mt-1.5">
-                      <Phone size={15} /> {user.phone}
+                      <Phone size={15} />
+                      {user.phone}
                     </p>
                   )}
 
                   <p className="flex items-center gap-2 text-sm text-gray-500 mt-1">
-                    <MapPin size={15} /> {user?.location || "India"}
+                    <MapPin size={15} />
+                    {user?.location || "India"}
                   </p>
 
                   <p className="flex items-center gap-2 text-sm text-gray-500 mt-1">
-                    <Sprout size={15} /> Farmer
+                    <Sprout size={15} />
+                    Farmer
                   </p>
                 </div>
               </div>
@@ -388,10 +471,12 @@ export default function FarmerSettingsPage({ user, onLogout }) {
                   <p className="text-sm font-semibold text-gray-800">
                     Mobile Number
                   </p>
+
                   <p className="text-xs text-gray-500 mt-0.5">
                     {user?.phone || "Not added"}
                   </p>
                 </div>
+
                 <span className="text-xs font-semibold text-green-600">
                   ✓ Verified
                 </span>
@@ -402,13 +487,16 @@ export default function FarmerSettingsPage({ user, onLogout }) {
                   <p className="text-sm font-semibold text-gray-800">
                     Identity Verification
                   </p>
+
                   <p className="text-xs text-gray-500 mt-0.5">
                     Government identity verification
                   </p>
                 </div>
-                <VerificationAction
+
+                <VerificationStatus
                   status={verificationStatus}
-                  onVerify={verify}
+                  onVerify={openVerification}
+                  compact
                 />
               </div>
 
@@ -417,16 +505,19 @@ export default function FarmerSettingsPage({ user, onLogout }) {
                   <p className="text-sm font-semibold text-gray-800">
                     Bank Verification
                   </p>
+
                   <p className="text-xs text-gray-500 mt-0.5">
                     Required for receiving payments
                   </p>
                 </div>
+
                 <button
                   type="button"
                   onClick={() => setShowBank(true)}
                   className="text-xs font-semibold text-green-700"
                 >
-                  Manage <ChevronRight size={13} className="inline ml-1" />
+                  Manage
+                  <ChevronRight size={13} className="inline ml-1" />
                 </button>
               </div>
             </div>
@@ -443,12 +534,13 @@ export default function FarmerSettingsPage({ user, onLogout }) {
                 <div
                   key={label}
                   className={`py-4 ${
-                    index !== farmItems.length - 1
+                    index < farmItems.length - 1
                       ? "border-b border-gray-100"
                       : ""
                   }`}
                 >
                   <p className="text-xs text-gray-500">{label}</p>
+
                   <p className="text-sm font-semibold text-gray-800 mt-1">
                     {value}
                   </p>
@@ -460,6 +552,7 @@ export default function FarmerSettingsPage({ user, onLogout }) {
                   <Truck size={15} className="text-gray-400" />
                   <p className="text-xs text-gray-500">Transportation</p>
                 </div>
+
                 <p className="text-sm font-semibold text-gray-800 mt-1">
                   Seller will arrange transportation
                 </p>
@@ -490,11 +583,13 @@ export default function FarmerSettingsPage({ user, onLogout }) {
                 subtitle="Bank account not added"
                 onClick={() => setShowBank(true)}
               />
+
               <PaymentRow
                 icon={ShieldCheck}
                 title="Payment Settlement"
                 subtitle="Track payments from your sales"
               />
+
               <PaymentRow
                 icon={WalletCards}
                 title="Payment History"
@@ -516,17 +611,19 @@ export default function FarmerSettingsPage({ user, onLogout }) {
                 <div
                   key={key}
                   className={`flex items-center justify-between py-4 ${
-                    index !== notificationItems.length - 1
+                    index < notificationItems.length - 1
                       ? "border-b border-gray-100"
                       : ""
                   }`}
                 >
                   <div className="flex items-center gap-3">
                     <Icon size={18} className="text-gray-500" />
+
                     <span className="text-sm font-semibold text-gray-800">
                       {label}
                     </span>
                   </div>
+
                   <Toggle
                     checked={notifications[key]}
                     onChange={() => toggleNotification(key)}
@@ -540,20 +637,23 @@ export default function FarmerSettingsPage({ user, onLogout }) {
           <section className={cardClass}>
             <button
               type="button"
-              onClick={() => setShowLang(!showLang)}
+              onClick={() => setShowLang((prev) => !prev)}
               className="w-full flex items-center justify-between px-5 py-4 text-left hover:bg-gray-50"
             >
               <div className="flex items-center gap-3">
                 <div className="w-9 h-9 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
                   <Globe size={19} />
                 </div>
+
                 <div>
                   <h2 className="font-bold text-gray-900">Language</h2>
+
                   <p className="text-sm text-gray-500 mt-0.5">
                     Change Language
                   </p>
                 </div>
               </div>
+
               <ChevronRight
                 size={20}
                 className={`text-gray-400 transition ${
@@ -584,6 +684,7 @@ export default function FarmerSettingsPage({ user, onLogout }) {
                 <Phone size={17} className="text-gray-400" />
                 <span>Helpline: +91 9999999990</span>
               </div>
+
               <div className="flex items-center gap-3 text-sm text-gray-600">
                 <Mail size={17} className="text-gray-400" />
                 <span>support@bharatfasal.in</span>
@@ -605,7 +706,8 @@ export default function FarmerSettingsPage({ user, onLogout }) {
             onClick={onLogout}
             className="lg:col-span-2 w-full flex items-center justify-center gap-2 py-3.5 rounded-xl border border-red-200 bg-white text-red-600 font-semibold hover:bg-red-50"
           >
-            <LogOut size={18} /> Logout
+            <LogOut size={18} />
+            Logout
           </button>
         </div>
       </div>
@@ -619,7 +721,12 @@ export default function FarmerSettingsPage({ user, onLogout }) {
         >
           <div className="p-5 space-y-4">
             <InfoRow label="Name" value={user?.name || "Farmer"} />
-            <InfoRow label="Mobile Number" value={user?.phone || "Not available"} />
+
+            <InfoRow
+              label="Mobile Number"
+              value={user?.phone || "Not available"}
+            />
+
             <InfoRow label="Location" value={user?.location || "India"} />
           </div>
 
@@ -656,6 +763,7 @@ export default function FarmerSettingsPage({ user, onLogout }) {
                 <label className="block text-xs font-semibold text-gray-600 mb-1">
                   Government ID Type
                 </label>
+
                 <select
                   value={verificationForm.idType}
                   onChange={(e) => updateForm("idType", e.target.value)}
@@ -677,6 +785,7 @@ export default function FarmerSettingsPage({ user, onLogout }) {
                   onChange={(value) => updateForm("idReference", value)}
                   placeholder="Enter ID reference"
                 />
+
                 <p className="text-[11px] text-gray-400 mt-1">
                   Demo flow only. Do not enter sensitive real ID numbers.
                 </p>
@@ -721,11 +830,13 @@ export default function FarmerSettingsPage({ user, onLogout }) {
               placeholder="Account Holder Name"
               className={inputClass}
             />
+
             <input
               type="text"
               placeholder="Account Number"
               className={inputClass}
             />
+
             <input
               type="text"
               placeholder="IFSC Code"
