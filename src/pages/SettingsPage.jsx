@@ -41,6 +41,9 @@ import SettingsLanguageSelector from "../components/SettingsLanguageSelector";
 // ============================================================
 
 const VERIFICATION_KEY = "bf_verification_requests";
+const VERIFICATION_API =
+  "https://bharat-fasal.onrender.com/api/verification";
+const TOKEN_KEY = "bf_auth_token";
 
 const getStoredVerification = (user) => {
   try {
@@ -406,155 +409,239 @@ export default function SettingsPage({ onLogout, user }) {
   // VERIFICATION SUBMISSION
   // ==========================================================
 
-  const submitVerification = () => {
-    if (!isBuyer) {
-      const type = identityDetails.documentType;
-      const number = identityDetails.documentNumber.trim().toUpperCase();
+  const submitVerification = async () => {
+  if (!isBuyer) {
+    const type = identityDetails.documentType;
+    const number = identityDetails.documentNumber.trim().toUpperCase();
 
-      if (!type) {
-        setIdentityError("Please select a document type.");
-        return;
-      }
-
-      if (!number) {
-        setIdentityError("Please enter your document number.");
-        return;
-      }
-
-      const rules = {
-        aadhaar: /^\d{12}$/,
-        pan: /^[A-Z]{5}\d{4}[A-Z]$/,
-        voter: /^[A-Z]{3,4}\d{6,10}$/,
-        driving: /^[A-Z]{2}\d{2}\s?\d{4,13}$/,
-      };
-
-      if (rules[type] && !rules[type].test(number)) {
-        setIdentityError(
-          type === "aadhaar"
-            ? "Aadhaar number must contain 12 digits."
-            : type === "pan"
-              ? "Enter a valid PAN format, e.g. ABCDE1234F."
-              : "Please enter a valid document number.",
-        );
-        return;
-      }
-
-      const request = {
-        id: `VER-${Date.now()}`,
-        userId: user?.id || `user-${Date.now()}`,
-        type: role,
-        name: profile.name || user?.name || "",
-        phone: profile.phone || user?.phone || "",
-        email: profile.email || user?.email || "",
-        location: profile.location || user?.location || "India",
-        identity: {
-          documentType: type,
-          documentNumber: number,
-        },
-        status: "pending",
-        verificationStatus: "pending",
-        submittedAt: new Date().toISOString(),
-      };
-
-      try {
-        const existing = JSON.parse(
-          localStorage.getItem(VERIFICATION_KEY) || "[]",
-        );
-
-        const requests = Array.isArray(existing) ? existing : [];
-        const existingIndex = requests.findIndex(
-          (item) =>
-            item.userId === request.userId || item.phone === request.phone,
-        );
-
-        if (existingIndex >= 0) {
-          requests[existingIndex] = {
-            ...requests[existingIndex],
-            ...request,
-            id: requests[existingIndex].id || request.id,
-          };
-        } else {
-          requests.push(request);
-        }
-
-        localStorage.setItem(VERIFICATION_KEY, JSON.stringify(requests));
-        setVerification(request);
-        setIdentityError("");
-        setActiveModal(null);
-
-        window.dispatchEvent(
-          new CustomEvent("bf-verification-submitted", {
-            detail: request,
-          }),
-        );
-      } catch (error) {
-        console.error("Verification submission failed", error);
-        setIdentityError("Unable to submit verification. Please try again.");
-      }
+    if (!type) {
+      setIdentityError("Please select a document type.");
       return;
     }
 
-    // Existing buyer verification flow
+    if (!number) {
+      setIdentityError("Please enter your document number.");
+      return;
+    }
+
+    const rules = {
+      aadhaar: /^\d{12}$/,
+      pan: /^[A-Z]{5}\d{4}[A-Z]$/,
+      voter: /^[A-Z]{3,4}\d{6,10}$/,
+      driving: /^[A-Z]{2}\d{2}\s?\d{4,13}$/,
+    };
+
+    if (rules[type] && !rules[type].test(number)) {
+      setIdentityError(
+        type === "aadhaar"
+          ? "Aadhaar number must contain 12 digits."
+          : type === "pan"
+            ? "Enter a valid PAN format, e.g. ABCDE1234F."
+            : "Please enter a valid document number.",
+      );
+      return;
+    }
+
     const request = {
       id: `VER-${Date.now()}`,
-      userId: user?.id || `buyer-${Date.now()}`,
-      type: "buyer",
+      userId: user?.id || `user-${Date.now()}`,
+      type: role,
       name: profile.name || user?.name || "",
       phone: profile.phone || user?.phone || "",
       email: profile.email || user?.email || "",
-      businessName: businessDetails.businessName || profile.companyName || "",
-      companyName: businessDetails.businessName || profile.companyName || "",
-      businessType: businessDetails.businessType,
       location: profile.location || user?.location || "India",
-      address: businessDetails.address,
-      pan: businessDetails.pan,
-      gstin: businessDetails.gstin,
-      documents: {
-        pan: documents.pan,
-        gst: documents.gst,
-        businessProof: documents.businessProof,
-        bankProof: documents.bankProof,
+      identity: {
+        documentType: type,
+        documentNumber: number,
       },
-      bankAccount: paymentDetails.accountNumber ? "Submitted" : "",
       status: "pending",
       verificationStatus: "pending",
       submittedAt: new Date().toISOString(),
     };
 
     try {
+      // ======================================================
+      // SAVE FARMER VERIFICATION TO BACKEND / MONGODB
+      // ======================================================
+
+      const token = localStorage.getItem("bf_auth_token");
+
+      if (!token) {
+        setIdentityError("Your session has expired. Please login again.");
+        return;
+      }
+
+      const idType =
+        type === "voter"
+          ? "voter_id"
+          : type === "driving"
+            ? "driving_license"
+            : type === "pan"
+              ? "other"
+              : type;
+
+      const response = await fetch(
+        "https://bharat-fasal.onrender.com/api/verification/farmer",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            fullName: request.name,
+            idType,
+            idReference: number,
+          }),
+        },
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        console.error("Farmer verification API error:", data);
+
+        setIdentityError(
+          data?.message || "Unable to submit verification. Please try again.",
+        );
+
+        return;
+      }
+
+      console.log("Farmer verification saved:", data);
+
+      // ======================================================
+      // KEEP LOCAL STORAGE IN SYNC
+      // ======================================================
+
+      const savedRequest = {
+        ...request,
+        status: data?.verification?.status || "pending",
+        verificationStatus:
+          data?.verification?.status || "pending",
+      };
+
       const existing = JSON.parse(
         localStorage.getItem(VERIFICATION_KEY) || "[]",
       );
+
       const requests = Array.isArray(existing) ? existing : [];
+
       const existingIndex = requests.findIndex(
         (item) =>
-          item.userId === request.userId || item.phone === request.phone,
+          item.userId === savedRequest.userId ||
+          item.phone === savedRequest.phone,
       );
 
       if (existingIndex >= 0) {
         requests[existingIndex] = {
           ...requests[existingIndex],
-          ...request,
-          id: requests[existingIndex].id || request.id,
+          ...savedRequest,
+          id: requests[existingIndex].id || savedRequest.id,
         };
       } else {
-        requests.push(request);
+        requests.push(savedRequest);
       }
 
-      localStorage.setItem(VERIFICATION_KEY, JSON.stringify(requests));
-      setVerification(request);
+      localStorage.setItem(
+        VERIFICATION_KEY,
+        JSON.stringify(requests),
+      );
+
+      setVerification(savedRequest);
+      setIdentityError("");
+      setActiveModal(null);
 
       window.dispatchEvent(
         new CustomEvent("bf-verification-submitted", {
-          detail: request,
+          detail: savedRequest,
         }),
       );
-
-      setActiveModal(null);
     } catch (error) {
-      console.error("Verification submission failed", error);
+      console.error("Farmer verification submission failed:", error);
+
+      setIdentityError(
+        "Unable to connect to the verification server. Please try again.",
+      );
     }
+
+    return;
+  }
+
+  // ==========================================================
+  // EXISTING BUYER VERIFICATION FLOW
+  // ==========================================================
+
+  const request = {
+    id: `VER-${Date.now()}`,
+    userId: user?.id || `buyer-${Date.now()}`,
+    type: "buyer",
+    name: profile.name || user?.name || "",
+    phone: profile.phone || user?.phone || "",
+    email: profile.email || user?.email || "",
+    businessName:
+      businessDetails.businessName || profile.companyName || "",
+    companyName:
+      businessDetails.businessName || profile.companyName || "",
+    businessType: businessDetails.businessType,
+    location: profile.location || user?.location || "India",
+    address: businessDetails.address,
+    pan: businessDetails.pan,
+    gstin: businessDetails.gstin,
+    documents: {
+      pan: documents.pan,
+      gst: documents.gst,
+      businessProof: documents.businessProof,
+      bankProof: documents.bankProof,
+    },
+    bankAccount: paymentDetails.accountNumber ? "Submitted" : "",
+    status: "pending",
+    verificationStatus: "pending",
+    submittedAt: new Date().toISOString(),
   };
+
+  try {
+    const existing = JSON.parse(
+      localStorage.getItem(VERIFICATION_KEY) || "[]",
+    );
+
+    const requests = Array.isArray(existing) ? existing : [];
+
+    const existingIndex = requests.findIndex(
+      (item) =>
+        item.userId === request.userId ||
+        item.phone === request.phone,
+    );
+
+    if (existingIndex >= 0) {
+      requests[existingIndex] = {
+        ...requests[existingIndex],
+        ...request,
+        id: requests[existingIndex].id || request.id,
+      };
+    } else {
+      requests.push(request);
+    }
+
+    localStorage.setItem(
+      VERIFICATION_KEY,
+      JSON.stringify(requests),
+    );
+
+    setVerification(request);
+
+    window.dispatchEvent(
+      new CustomEvent("bf-verification-submitted", {
+        detail: request,
+      }),
+    );
+  } catch (error) {
+    console.error("Buyer verification submission failed", error);
+    setIdentityError(
+      "Unable to submit verification. Please try again.",
+    );
+  }
+};
   // ==========================================================
   // VERIFICATION STATUS
   // ==========================================================
