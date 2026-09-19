@@ -601,46 +601,95 @@ export default function SettingsPage({ onLogout, user }) {
   };
 
   try {
-    const existing = JSON.parse(
-      localStorage.getItem(VERIFICATION_KEY) || "[]",
-    );
+  const token = localStorage.getItem(TOKEN_KEY);
 
-    const requests = Array.isArray(existing) ? existing : [];
-
-    const existingIndex = requests.findIndex(
-      (item) =>
-        item.userId === request.userId ||
-        item.phone === request.phone,
-    );
-
-    if (existingIndex >= 0) {
-      requests[existingIndex] = {
-        ...requests[existingIndex],
-        ...request,
-        id: requests[existingIndex].id || request.id,
-      };
-    } else {
-      requests.push(request);
-    }
-
-    localStorage.setItem(
-      VERIFICATION_KEY,
-      JSON.stringify(requests),
-    );
-
-    setVerification(request);
-
-    window.dispatchEvent(
-      new CustomEvent("bf-verification-submitted", {
-        detail: request,
-      }),
-    );
-  } catch (error) {
-    console.error("Buyer verification submission failed", error);
-    setIdentityError(
-      "Unable to submit verification. Please try again.",
-    );
+  if (!token) {
+    setIdentityError("Your session has expired. Please login again.");
+    return;
   }
+
+  const response = await fetch(`${VERIFICATION_API}/buyer`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({
+      businessName: request.businessName,
+      businessType: request.businessType,
+      address: request.address,
+      pan: request.pan,
+      gstin: request.gstin,
+      documents: request.documents,
+      bankName: paymentDetails.bankName,
+      accountNumber: paymentDetails.accountNumber,
+      ifsc: paymentDetails.ifsc,
+      upi: paymentDetails.upi,
+    }),
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    console.error("Buyer verification API error:", data);
+
+    setIdentityError(
+      data?.message || "Unable to submit buyer verification.",
+    );
+
+    return;
+  }
+
+  console.log("Buyer verification saved:", data);
+
+  const savedRequest = {
+    ...request,
+    status: data?.verification?.status || "pending",
+    verificationStatus:
+      data?.verification?.status || "pending",
+  };
+
+  const existing = JSON.parse(
+    localStorage.getItem(VERIFICATION_KEY) || "[]",
+  );
+
+  const requests = Array.isArray(existing) ? existing : [];
+
+  const existingIndex = requests.findIndex(
+    (item) =>
+      item.userId === savedRequest.userId ||
+      item.phone === savedRequest.phone,
+  );
+
+  if (existingIndex >= 0) {
+    requests[existingIndex] = {
+      ...requests[existingIndex],
+      ...savedRequest,
+      id: requests[existingIndex].id || savedRequest.id,
+    };
+  } else {
+    requests.push(savedRequest);
+  }
+
+  localStorage.setItem(
+    VERIFICATION_KEY,
+    JSON.stringify(requests),
+  );
+
+  setVerification(savedRequest);
+
+  window.dispatchEvent(
+    new CustomEvent("bf-verification-submitted", {
+      detail: savedRequest,
+    }),
+  );
+} catch (error) {
+  console.error("Buyer verification submission failed:", error);
+
+  setIdentityError(
+    "Unable to connect to the verification server. Please try again.",
+  );
+}
 };
   // ==========================================================
   // VERIFICATION STATUS
