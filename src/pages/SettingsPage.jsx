@@ -33,24 +33,14 @@ import {
   Package,
   Truck,
 } from "lucide-react";
-
 import SettingsLanguageSelector from "../components/SettingsLanguageSelector";
-
-// ============================================================
-// HELPERS
-// ============================================================
-
 const VERIFICATION_KEY = "bf_verification_requests";
-const VERIFICATION_API =
-  "https://bharat-fasal.onrender.com/api/verification";
+const VERIFICATION_API = "https://bharat-fasal.onrender.com/api/verification";
 const TOKEN_KEY = "bf_auth_token";
-
 const getStoredVerification = (user) => {
   try {
     const requests = JSON.parse(localStorage.getItem(VERIFICATION_KEY) || "[]");
-
     if (!Array.isArray(requests)) return null;
-
     return (
       requests.find(
         (item) => item.userId === user?.id || item.phone === user?.phone,
@@ -60,75 +50,42 @@ const getStoredVerification = (user) => {
     return null;
   }
 };
-
 const getStoredProfile = (user) => {
   try {
     const profiles = JSON.parse(
       localStorage.getItem("bf_user_profiles") || "{}",
     );
-
     return profiles[user?.id] || {};
   } catch {
     return {};
   }
 };
-
 const saveProfile = (userId, profile) => {
   try {
     const profiles = JSON.parse(
       localStorage.getItem("bf_user_profiles") || "{}",
     );
-
     profiles[userId] = profile;
-
     localStorage.setItem("bf_user_profiles", JSON.stringify(profiles));
   } catch (error) {
     console.error("Unable to save profile", error);
   }
 };
-
-// ============================================================
-// MAIN COMPONENT
-// ============================================================
-
 export default function SettingsPage({ onLogout, user }) {
   const { t, i18n } = useTranslation();
-
   const role = user?.role || "farmer";
-
   const isBuyer = role === "buyer";
   const isFarmer = role === "farmer";
   const isFpo = role === "fpo";
   const isAdmin = role === "admin";
-
-  // ==========================================================
-  // MODALS
-  // ==========================================================
-
   const [activeModal, setActiveModal] = useState(null);
-
-  // ==========================================================
-  // LANGUAGE
-  // ==========================================================
-
   const [showLang, setShowLang] = useState(false);
-
-  // ==========================================================
-  // NOTIFICATIONS
-  // ==========================================================
-
   const [notifications, setNotifications] = useState({
     prices: true,
     buyers: true,
     payments: true,
   });
-
-  // ==========================================================
-  // PROFILE
-  // ==========================================================
-
   const storedProfile = getStoredProfile(user);
-
   const [profile, setProfile] = useState({
     name: storedProfile.name || user?.name || "",
     companyName:
@@ -140,11 +97,6 @@ export default function SettingsPage({ onLogout, user }) {
     location: storedProfile.location || user?.location || "",
     email: storedProfile.email || user?.email || "",
   });
-
-  // ==========================================================
-  // BUYER BUSINESS DETAILS
-  // ==========================================================
-
   const [businessDetails, setBusinessDetails] = useState({
     businessName:
       storedProfile.businessName ||
@@ -156,22 +108,12 @@ export default function SettingsPage({ onLogout, user }) {
     pan: storedProfile.pan || "",
     address: storedProfile.address || "",
   });
-
-  // ==========================================================
-  // DOCUMENTS
-  // ==========================================================
-
   const [documents, setDocuments] = useState({
     pan: false,
     gst: false,
     businessProof: false,
     bankProof: false,
   });
-
-  // ==========================================================
-  // PROCUREMENT PREFERENCES
-  // ==========================================================
-
   const [preferences, setPreferences] = useState({
     crops: storedProfile.preferredCrops || "Rice, Wheat, Maize",
     grade: storedProfile.preferredGrade || "A / Premium",
@@ -180,61 +122,33 @@ export default function SettingsPage({ onLogout, user }) {
     transportation:
       storedProfile.transportation || "I will arrange transportation",
   });
-
-  // ==========================================================
-  // PAYMENT DETAILS
-  // ==========================================================
-
   const [paymentDetails, setPaymentDetails] = useState({
     bankName: storedProfile.bankName || "",
     accountNumber: storedProfile.accountNumber || "",
     ifsc: storedProfile.ifsc || "",
     upi: storedProfile.upi || "",
   });
-
-  // ==========================================================
-  // VERIFICATION
-  // ==========================================================
-
   const [verification, setVerification] = useState(() =>
     getStoredVerification(user),
   );
-
-  // Identity verification details
   const [identityDetails, setIdentityDetails] = useState({
     documentType: "",
     documentNumber: "",
   });
   const [identityError, setIdentityError] = useState("");
-
-  // ==========================================================
-  // SYNC VERIFICATION
-  // ==========================================================
-
   useEffect(() => {
     const syncVerification = () => {
       setVerification(getStoredVerification(user));
     };
-
     window.addEventListener("bf-verification-updated", syncVerification);
-
     window.addEventListener("storage", syncVerification);
-
     const interval = setInterval(syncVerification, 2000);
-
     return () => {
       window.removeEventListener("bf-verification-updated", syncVerification);
-
       window.removeEventListener("storage", syncVerification);
-
       clearInterval(interval);
     };
   }, [user]);
-
-  // ==========================================================
-  // ROLE CONTENT
-  // ==========================================================
-
   const roleInfo = useMemo(() => {
     if (isBuyer) {
       return {
@@ -248,7 +162,6 @@ export default function SettingsPage({ onLogout, user }) {
         profileSubtitle: "Your buyer account information",
       };
     }
-
     if (isFpo) {
       return {
         label: "FPO",
@@ -261,7 +174,6 @@ export default function SettingsPage({ onLogout, user }) {
         profileSubtitle: "Your FPO account information",
       };
     }
-
     if (isAdmin) {
       return {
         label: "Admin",
@@ -274,7 +186,6 @@ export default function SettingsPage({ onLogout, user }) {
         profileSubtitle: "Your administrator account information",
       };
     }
-
     return {
       label: "Farmer",
       title: "Farmer Settings",
@@ -286,20 +197,13 @@ export default function SettingsPage({ onLogout, user }) {
       profileSubtitle: "Your personal and farming information",
     };
   }, [isBuyer, isFpo, isAdmin]);
-
   const RoleIcon = roleInfo.icon;
-
-  // ==========================================================
-  // NOTIFICATIONS
-  // ==========================================================
-
   const toggleNotification = (key) => {
     setNotifications((prev) => ({
       ...prev,
       [key]: !prev[key],
     }));
   };
-
   const notificationItems = [
     {
       key: "prices",
@@ -317,40 +221,20 @@ export default function SettingsPage({ onLogout, user }) {
       icon: WalletCards,
     },
   ];
-
-  // ==========================================================
-  // LANGUAGE
-  // ==========================================================
-
   const handleLanguageChange = (lang) => {
     i18n.changeLanguage(lang);
-
     document.documentElement.setAttribute("lang", lang);
-
     document.documentElement.setAttribute("dir", lang === "ur" ? "rtl" : "ltr");
-
     setShowLang(false);
   };
-
-  // ==========================================================
-  // SAVE PROFILE
-  // ==========================================================
-
   const handleSaveProfile = () => {
     const updated = {
       ...profile,
       businessName: businessDetails.businessName,
     };
-
     saveProfile(user?.id, updated);
-
     setActiveModal(null);
   };
-
-  // ==========================================================
-  // SAVE BUSINESS DETAILS
-  // ==========================================================
-
   const handleSaveBusiness = () => {
     const updatedProfile = {
       ...profile,
@@ -360,18 +244,10 @@ export default function SettingsPage({ onLogout, user }) {
       pan: businessDetails.pan,
       address: businessDetails.address,
     };
-
     setProfile(updatedProfile);
-
     saveProfile(user?.id, updatedProfile);
-
     setActiveModal(null);
   };
-
-  // ==========================================================
-  // SAVE PREFERENCES
-  // ==========================================================
-
   const handleSavePreferences = () => {
     const updatedProfile = {
       ...profile,
@@ -381,16 +257,9 @@ export default function SettingsPage({ onLogout, user }) {
       deliveryLocation: preferences.location,
       transportation: preferences.transportation,
     };
-
     saveProfile(user?.id, updatedProfile);
-
     setActiveModal(null);
   };
-
-  // ==========================================================
-  // SAVE PAYMENT
-  // ==========================================================
-
   const handleSavePayment = () => {
     const updatedProfile = {
       ...profile,
@@ -399,140 +268,204 @@ export default function SettingsPage({ onLogout, user }) {
       ifsc: paymentDetails.ifsc,
       upi: paymentDetails.upi,
     };
-
     saveProfile(user?.id, updatedProfile);
-
     setActiveModal(null);
   };
-
-  // ==========================================================
-  // VERIFICATION SUBMISSION
-  // ==========================================================
-
   const submitVerification = async () => {
-  if (!isBuyer) {
-    const type = identityDetails.documentType;
-    const number = identityDetails.documentNumber.trim().toUpperCase();
-
-    if (!type) {
-      setIdentityError("Please select a document type.");
+    if (!isBuyer) {
+      const type = identityDetails.documentType;
+      const number = identityDetails.documentNumber.trim().toUpperCase();
+      if (!type) {
+        setIdentityError("Please select a document type.");
+        return;
+      }
+      if (!number) {
+        setIdentityError("Please enter your document number.");
+        return;
+      }
+      const rules = {
+        aadhaar: /^\d{12}$/,
+        pan: /^[A-Z]{5}\d{4}[A-Z]$/,
+        voter: /^[A-Z]{3,4}\d{6,10}$/,
+        driving: /^[A-Z]{2}\d{2}\s?\d{4,13}$/,
+      };
+      if (rules[type] && !rules[type].test(number)) {
+        setIdentityError(
+          type === "aadhaar"
+            ? "Aadhaar number must contain 12 digits."
+            : type === "pan"
+              ? "Enter a valid PAN format, e.g. ABCDE1234F."
+              : "Please enter a valid document number.",
+        );
+        return;
+      }
+      const request = {
+        id: `VER-${Date.now()}`,
+        userId: user?.id || `user-${Date.now()}`,
+        type: role,
+        name: profile.name || user?.name || "",
+        phone: profile.phone || user?.phone || "",
+        email: profile.email || user?.email || "",
+        location: profile.location || user?.location || "India",
+        identity: {
+          documentType: type,
+          documentNumber: number,
+        },
+        status: "pending",
+        verificationStatus: "pending",
+        submittedAt: new Date().toISOString(),
+      };
+      try {
+        const token = localStorage.getItem("bf_auth_token");
+        if (!token) {
+          setIdentityError("Your session has expired. Please login again.");
+          return;
+        }
+        const idType =
+          type === "voter"
+            ? "voter_id"
+            : type === "driving"
+              ? "driving_license"
+              : type === "pan"
+                ? "other"
+                : type;
+        const response = await fetch(
+          "https://bharat-fasal.onrender.com/api/verification/farmer",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+              fullName: request.name,
+              idType,
+              idReference: number,
+            }),
+          },
+        );
+        const data = await response.json();
+        if (!response.ok) {
+          console.error("Farmer verification API error:", data);
+          setIdentityError(
+            data?.message || "Unable to submit verification. Please try again.",
+          );
+          return;
+        }
+        console.log("Farmer verification saved:", data);
+        const savedRequest = {
+          ...request,
+          status: data?.verification?.status || "pending",
+          verificationStatus: data?.verification?.status || "pending",
+        };
+        const existing = JSON.parse(
+          localStorage.getItem(VERIFICATION_KEY) || "[]",
+        );
+        const requests = Array.isArray(existing) ? existing : [];
+        const existingIndex = requests.findIndex(
+          (item) =>
+            item.userId === savedRequest.userId ||
+            item.phone === savedRequest.phone,
+        );
+        if (existingIndex >= 0) {
+          requests[existingIndex] = {
+            ...requests[existingIndex],
+            ...savedRequest,
+            id: requests[existingIndex].id || savedRequest.id,
+          };
+        } else {
+          requests.push(savedRequest);
+        }
+        localStorage.setItem(VERIFICATION_KEY, JSON.stringify(requests));
+        setVerification(savedRequest);
+        setIdentityError("");
+        setActiveModal(null);
+        window.dispatchEvent(
+          new CustomEvent("bf-verification-submitted", {
+            detail: savedRequest,
+          }),
+        );
+      } catch (error) {
+        console.error("Farmer verification submission failed:", error);
+        setIdentityError(
+          "Unable to connect to the verification server. Please try again.",
+        );
+      }
       return;
     }
-
-    if (!number) {
-      setIdentityError("Please enter your document number.");
-      return;
-    }
-
-    const rules = {
-      aadhaar: /^\d{12}$/,
-      pan: /^[A-Z]{5}\d{4}[A-Z]$/,
-      voter: /^[A-Z]{3,4}\d{6,10}$/,
-      driving: /^[A-Z]{2}\d{2}\s?\d{4,13}$/,
-    };
-
-    if (rules[type] && !rules[type].test(number)) {
-      setIdentityError(
-        type === "aadhaar"
-          ? "Aadhaar number must contain 12 digits."
-          : type === "pan"
-            ? "Enter a valid PAN format, e.g. ABCDE1234F."
-            : "Please enter a valid document number.",
-      );
-      return;
-    }
-
     const request = {
       id: `VER-${Date.now()}`,
-      userId: user?.id || `user-${Date.now()}`,
-      type: role,
+      userId: user?.id || `buyer-${Date.now()}`,
+      type: "buyer",
       name: profile.name || user?.name || "",
       phone: profile.phone || user?.phone || "",
       email: profile.email || user?.email || "",
+      businessName: businessDetails.businessName || profile.companyName || "",
+      companyName: businessDetails.businessName || profile.companyName || "",
+      businessType: businessDetails.businessType,
       location: profile.location || user?.location || "India",
-      identity: {
-        documentType: type,
-        documentNumber: number,
+      address: businessDetails.address,
+      pan: businessDetails.pan,
+      gstin: businessDetails.gstin,
+      documents: {
+        pan: documents.pan,
+        gst: documents.gst,
+        businessProof: documents.businessProof,
+        bankProof: documents.bankProof,
       },
+      bankAccount: paymentDetails.accountNumber ? "Submitted" : "",
       status: "pending",
       verificationStatus: "pending",
       submittedAt: new Date().toISOString(),
     };
-
     try {
-      // ======================================================
-      // SAVE FARMER VERIFICATION TO BACKEND / MONGODB
-      // ======================================================
-
-      const token = localStorage.getItem("bf_auth_token");
-
+      const token = localStorage.getItem(TOKEN_KEY);
       if (!token) {
         setIdentityError("Your session has expired. Please login again.");
         return;
       }
-
-      const idType =
-        type === "voter"
-          ? "voter_id"
-          : type === "driving"
-            ? "driving_license"
-            : type === "pan"
-              ? "other"
-              : type;
-
-      const response = await fetch(
-        "https://bharat-fasal.onrender.com/api/verification/farmer",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            fullName: request.name,
-            idType,
-            idReference: number,
-          }),
+      const response = await fetch(`${VERIFICATION_API}/buyer`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
         },
-      );
-
+        body: JSON.stringify({
+          businessName: request.businessName,
+          businessType: request.businessType,
+          address: request.address,
+          pan: request.pan,
+          gstin: request.gstin,
+          documents: request.documents,
+          bankName: paymentDetails.bankName,
+          accountNumber: paymentDetails.accountNumber,
+          ifsc: paymentDetails.ifsc,
+          upi: paymentDetails.upi,
+        }),
+      });
       const data = await response.json();
-
       if (!response.ok) {
-        console.error("Farmer verification API error:", data);
-
+        console.error("Buyer verification API error:", data);
         setIdentityError(
-          data?.message || "Unable to submit verification. Please try again.",
+          data?.message || "Unable to submit buyer verification.",
         );
-
         return;
       }
-
-      console.log("Farmer verification saved:", data);
-
-      // ======================================================
-      // KEEP LOCAL STORAGE IN SYNC
-      // ======================================================
-
+      console.log("Buyer verification saved:", data);
       const savedRequest = {
         ...request,
         status: data?.verification?.status || "pending",
-        verificationStatus:
-          data?.verification?.status || "pending",
+        verificationStatus: data?.verification?.status || "pending",
       };
-
       const existing = JSON.parse(
         localStorage.getItem(VERIFICATION_KEY) || "[]",
       );
-
       const requests = Array.isArray(existing) ? existing : [];
-
       const existingIndex = requests.findIndex(
         (item) =>
           item.userId === savedRequest.userId ||
           item.phone === savedRequest.phone,
       );
-
       if (existingIndex >= 0) {
         requests[existingIndex] = {
           ...requests[existingIndex],
@@ -542,190 +475,33 @@ export default function SettingsPage({ onLogout, user }) {
       } else {
         requests.push(savedRequest);
       }
-
-      localStorage.setItem(
-        VERIFICATION_KEY,
-        JSON.stringify(requests),
-      );
-
+      localStorage.setItem(VERIFICATION_KEY, JSON.stringify(requests));
       setVerification(savedRequest);
       setIdentityError("");
       setActiveModal(null);
-
       window.dispatchEvent(
         new CustomEvent("bf-verification-submitted", {
           detail: savedRequest,
         }),
       );
     } catch (error) {
-      console.error("Farmer verification submission failed:", error);
-
+      console.error("Buyer verification submission failed:", error);
       setIdentityError(
         "Unable to connect to the verification server. Please try again.",
       );
     }
-
-    return;
-  }
-
-  // ==========================================================
-  // EXISTING BUYER VERIFICATION FLOW
-  // ==========================================================
-
-  const request = {
-    id: `VER-${Date.now()}`,
-    userId: user?.id || `buyer-${Date.now()}`,
-    type: "buyer",
-    name: profile.name || user?.name || "",
-    phone: profile.phone || user?.phone || "",
-    email: profile.email || user?.email || "",
-    businessName:
-      businessDetails.businessName || profile.companyName || "",
-    companyName:
-      businessDetails.businessName || profile.companyName || "",
-    businessType: businessDetails.businessType,
-    location: profile.location || user?.location || "India",
-    address: businessDetails.address,
-    pan: businessDetails.pan,
-    gstin: businessDetails.gstin,
-    documents: {
-      pan: documents.pan,
-      gst: documents.gst,
-      businessProof: documents.businessProof,
-      bankProof: documents.bankProof,
-    },
-    bankAccount: paymentDetails.accountNumber ? "Submitted" : "",
-    status: "pending",
-    verificationStatus: "pending",
-    submittedAt: new Date().toISOString(),
   };
-
-  try {
-  const token = localStorage.getItem(TOKEN_KEY);
-
-  if (!token) {
-    setIdentityError("Your session has expired. Please login again.");
-    return;
-  }
-
-  const response = await fetch(`${VERIFICATION_API}/buyer`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
-    body: JSON.stringify({
-      businessName: request.businessName,
-      businessType: request.businessType,
-      address: request.address,
-      pan: request.pan,
-      gstin: request.gstin,
-      documents: request.documents,
-      bankName: paymentDetails.bankName,
-      accountNumber: paymentDetails.accountNumber,
-      ifsc: paymentDetails.ifsc,
-      upi: paymentDetails.upi,
-    }),
-  });
-
-  const data = await response.json();
-
-  if (!response.ok) {
-    console.error("Buyer verification API error:", data);
-
-    setIdentityError(
-      data?.message || "Unable to submit buyer verification.",
-    );
-
-    return;
-  }
-
-  console.log("Buyer verification saved:", data);
-
-  const savedRequest = {
-    ...request,
-    status: data?.verification?.status || "pending",
-    verificationStatus:
-      data?.verification?.status || "pending",
-  };
-
-  const existing = JSON.parse(
-    localStorage.getItem(VERIFICATION_KEY) || "[]",
-  );
-
-  const requests = Array.isArray(existing) ? existing : [];
-
-  const existingIndex = requests.findIndex(
-    (item) =>
-      item.userId === savedRequest.userId ||
-      item.phone === savedRequest.phone,
-  );
-
-  if (existingIndex >= 0) {
-    requests[existingIndex] = {
-      ...requests[existingIndex],
-      ...savedRequest,
-      id: requests[existingIndex].id || savedRequest.id,
-    };
-  } else {
-    requests.push(savedRequest);
-  }
-
-  localStorage.setItem(
-    VERIFICATION_KEY,
-    JSON.stringify(requests),
-  );
-
-  setVerification(savedRequest);
-
-  window.dispatchEvent(
-    new CustomEvent("bf-verification-submitted", {
-      detail: savedRequest,
-    }),
-  );
-} catch (error) {
-  console.error("Buyer verification submission failed:", error);
-
-  setIdentityError(
-    "Unable to connect to the verification server. Please try again.",
-  );
-}
-};
-  // ==========================================================
-  // VERIFICATION STATUS
-  // ==========================================================
-
   const verificationStatus =
     verification?.status || verification?.verificationStatus || "not_submitted";
-
   const isVerified = verificationStatus === "approved";
-
   const isVerificationPending =
     verificationStatus === "pending" || verificationStatus === "under_review";
-
-  // ==========================================================
-  // MODAL CLOSE
-  // ==========================================================
-
   const closeModal = () => {
     setActiveModal(null);
   };
-
-  // ==========================================================
-  // RENDER
-  // ==========================================================
-
   return (
     <div className="w-full min-h-screen bg-gray-50">
-      {/* ======================================================
-          PAGE
-      ====================================================== */}
-
       <div className="w-full max-w-[1500px] mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
-        {/* ====================================================
-            HEADER
-        ==================================================== */}
-
         <div className="flex items-center gap-3">
           <div
             className={`
@@ -738,25 +514,14 @@ export default function SettingsPage({ onLogout, user }) {
           >
             <Settings size={22} />
           </div>
-
           <div>
             <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
               {roleInfo.title}
             </h1>
-
             <p className="text-sm text-gray-500 mt-0.5">{roleInfo.subtitle}</p>
           </div>
         </div>
-
-        {/* ====================================================
-            MAIN GRID
-        ==================================================== */}
-
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-start">
-          {/* ==================================================
-              PROFILE
-          ================================================== */}
-
           <section className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
             <CardHeader
               icon={RoleIcon}
@@ -765,7 +530,6 @@ export default function SettingsPage({ onLogout, user }) {
               title={roleInfo.profileTitle}
               subtitle={roleInfo.profileSubtitle}
             />
-
             <div className="p-5">
               <div className="flex items-center gap-4">
                 <div className="w-20 h-20 rounded-2xl bg-green-50 border border-green-100 flex items-center justify-center shrink-0">
@@ -775,7 +539,6 @@ export default function SettingsPage({ onLogout, user }) {
                     className={roleInfo.color}
                   />
                 </div>
-
                 <div className="min-w-0">
                   <h3 className="text-xl font-bold text-gray-900 truncate">
                     {isBuyer
@@ -785,45 +548,35 @@ export default function SettingsPage({ onLogout, user }) {
                         "Business Name not added"
                       : profile.name || "User"}
                   </h3>
-
                   {isBuyer && profile.name && (
                     <p className="text-sm text-gray-500 mt-1">{profile.name}</p>
                   )}
-
                   {profile.phone && (
                     <p className="flex items-center gap-2 text-sm text-gray-500 mt-1.5">
                       <Phone size={14} />
                       {profile.phone}
                     </p>
                   )}
-
                   <p className="flex items-center gap-2 text-sm text-gray-500 mt-1">
                     <MapPin size={14} />
                     {profile.location || "India"}
                   </p>
-
                   <p className="flex items-center gap-2 text-sm text-gray-500 mt-1">
                     <RoleIcon size={14} className={roleInfo.color} />
-
                     {roleInfo.label}
                   </p>
                 </div>
               </div>
-
-              {/* STATUS */}
-
               <div className="flex flex-wrap gap-2 mt-5">
                 <span className="px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 text-xs font-semibold">
                   {roleInfo.label}
                 </span>
-
                 {isBuyer && (
                   <VerificationBadge
                     status={isVerified ? "approved" : verificationStatus}
                   />
                 )}
               </div>
-
               <button
                 type="button"
                 onClick={() => setActiveModal("profile")}
@@ -833,11 +586,6 @@ export default function SettingsPage({ onLogout, user }) {
               </button>
             </div>
           </section>
-
-          {/* ==================================================
-              VERIFICATION
-          ================================================== */}
-
           {isBuyer ? (
             <section className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
               <CardHeader
@@ -847,10 +595,7 @@ export default function SettingsPage({ onLogout, user }) {
                 title="Business Verification"
                 subtitle="Build trust with farmers and FPOs"
               />
-
               <div className="p-5 space-y-4">
-                {/* MOBILE */}
-
                 <InfoRow
                   label="Mobile Number"
                   value={profile.phone ? profile.phone : "Not added"}
@@ -866,9 +611,6 @@ export default function SettingsPage({ onLogout, user }) {
                     )
                   }
                 />
-
-                {/* BUSINESS */}
-
                 <InfoRow
                   label="Business Details"
                   value={
@@ -889,9 +631,6 @@ export default function SettingsPage({ onLogout, user }) {
                   }
                   onClick={() => setActiveModal("business")}
                 />
-
-                {/* DOCUMENTS */}
-
                 <InfoRow
                   label="Business Documents"
                   value="PAN / GSTIN / business registration"
@@ -903,9 +642,6 @@ export default function SettingsPage({ onLogout, user }) {
                   }
                   onClick={() => setActiveModal("documents")}
                 />
-
-                {/* VERIFICATION STATUS */}
-
                 <div
                   className={`
                     rounded-xl border p-4
@@ -925,7 +661,6 @@ export default function SettingsPage({ onLogout, user }) {
                     ) : (
                       <Clock3 size={19} className="text-amber-600 mt-0.5" />
                     )}
-
                     <div className="flex-1">
                       <p className="text-sm font-semibold text-gray-900">
                         {isVerified
@@ -934,7 +669,6 @@ export default function SettingsPage({ onLogout, user }) {
                             ? "Verification Pending"
                             : "Verification Rejected"}
                       </p>
-
                       <p className="text-xs text-gray-600 mt-1">
                         {isVerified
                           ? "Your business information has been approved by the admin."
@@ -945,7 +679,6 @@ export default function SettingsPage({ onLogout, user }) {
                     </div>
                   </div>
                 </div>
-
                 {!isVerified && (
                   <button
                     type="button"
@@ -980,7 +713,6 @@ export default function SettingsPage({ onLogout, user }) {
                       : "Manage account verification"
                 }
               />
-
               <div className="p-5 space-y-4">
                 <InfoRow
                   label="Mobile Number"
@@ -997,7 +729,6 @@ export default function SettingsPage({ onLogout, user }) {
                     )
                   }
                 />
-
                 <InfoRow
                   label="Identity Verification"
                   value={
@@ -1031,7 +762,6 @@ export default function SettingsPage({ onLogout, user }) {
                     )
                   }
                 />
-
                 {verificationStatus !== "approved" && (
                   <button
                     type="button"
@@ -1048,7 +778,6 @@ export default function SettingsPage({ onLogout, user }) {
                         : "Start Verification"}
                   </button>
                 )}
-
                 <InfoRow
                   label="Bank Verification"
                   value="Required for receiving payments"
@@ -1063,11 +792,6 @@ export default function SettingsPage({ onLogout, user }) {
               </div>
             </section>
           )}
-
-          {/* ==================================================
-              BUYER PROCUREMENT
-          ================================================== */}
-
           {isBuyer ? (
             <section className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
               <CardHeader
@@ -1077,33 +801,27 @@ export default function SettingsPage({ onLogout, user }) {
                 title="Procurement Preferences"
                 subtitle="Set your preferred procurement requirements"
               />
-
               <div className="px-5">
                 <PreferenceRow
                   label="Preferred Crops"
                   value={preferences.crops}
                 />
-
                 <PreferenceRow
                   label="Preferred Grade"
                   value={preferences.grade}
                 />
-
                 <PreferenceRow
                   label="Typical Purchase Quantity"
                   value={preferences.quantity}
                 />
-
                 <PreferenceRow
                   label="Preferred Delivery Location"
                   value={preferences.location}
                 />
-
                 <PreferenceRow
                   label="Transportation"
                   value={preferences.transportation}
                 />
-
                 <button
                   type="button"
                   onClick={() => setActiveModal("preferences")}
@@ -1130,25 +848,20 @@ export default function SettingsPage({ onLogout, user }) {
                     : "Manage your crop and selling preferences"
                 }
               />
-
               <div className="px-5">
                 <PreferenceRow
                   label={isFpo ? "Main Crops" : "Main Crops"}
                   value="Wheat, Rice, Maize"
                 />
-
                 <PreferenceRow
                   label="Typical Lot Size"
                   value="50–200 Quintals"
                 />
-
                 <PreferenceRow label="Preferred Quality" value="A / Premium" />
-
                 <PreferenceRow
                   label="Transportation"
                   value="Seller will arrange transportation"
                 />
-
                 <button
                   type="button"
                   onClick={() => setActiveModal("preferences")}
@@ -1159,11 +872,6 @@ export default function SettingsPage({ onLogout, user }) {
               </div>
             </section>
           )}
-
-          {/* ==================================================
-              PAYMENTS
-          ================================================== */}
-
           <section className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
             <CardHeader
               icon={WalletCards}
@@ -1176,7 +884,6 @@ export default function SettingsPage({ onLogout, user }) {
                   : "Manage your payment settlement"
               }
             />
-
             <div className="divide-y divide-gray-100">
               <ActionRow
                 icon={CreditCard}
@@ -1188,7 +895,6 @@ export default function SettingsPage({ onLogout, user }) {
                 }
                 onClick={() => setActiveModal("payment")}
               />
-
               <ActionRow
                 icon={LockKeyhole}
                 title={isBuyer ? "Protected Payments" : "Payment Settlement"}
@@ -1199,7 +905,6 @@ export default function SettingsPage({ onLogout, user }) {
                 }
                 onClick={() => setActiveModal("protected")}
               />
-
               <ActionRow
                 icon={History}
                 title="Payment History"
@@ -1212,11 +917,6 @@ export default function SettingsPage({ onLogout, user }) {
               />
             </div>
           </section>
-
-          {/* ==================================================
-              NOTIFICATIONS
-          ================================================== */}
-
           <section className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
             <CardHeader
               icon={Bell}
@@ -1225,11 +925,9 @@ export default function SettingsPage({ onLogout, user }) {
               title="Notifications"
               subtitle="Choose what updates you receive"
             />
-
             <div className="px-5">
               {notificationItems.map((item, index) => {
                 const Icon = item.icon;
-
                 return (
                   <div
                     key={item.key}
@@ -1247,12 +945,10 @@ export default function SettingsPage({ onLogout, user }) {
                   >
                     <div className="flex items-center gap-3">
                       <Icon size={18} className="text-gray-500" />
-
                       <span className="text-sm font-semibold text-gray-800">
                         {item.label}
                       </span>
                     </div>
-
                     <button
                       type="button"
                       role="switch"
@@ -1288,11 +984,6 @@ export default function SettingsPage({ onLogout, user }) {
               })}
             </div>
           </section>
-
-          {/* ==================================================
-              LANGUAGE
-          ================================================== */}
-
           <section className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
             <button
               type="button"
@@ -1303,16 +994,13 @@ export default function SettingsPage({ onLogout, user }) {
                 <div className="w-9 h-9 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
                   <Globe size={19} />
                 </div>
-
                 <div>
                   <h2 className="font-bold text-gray-900">Language</h2>
-
                   <p className="text-sm text-gray-500 mt-0.5">
                     Change Language
                   </p>
                 </div>
               </div>
-
               <ChevronRight
                 size={19}
                 className={`
@@ -1322,7 +1010,6 @@ export default function SettingsPage({ onLogout, user }) {
                 `}
               />
             </button>
-
             {showLang && (
               <div className="px-5 pb-5 pt-2 border-t border-gray-100">
                 <SettingsLanguageSelector
@@ -1332,11 +1019,6 @@ export default function SettingsPage({ onLogout, user }) {
               </div>
             )}
           </section>
-
-          {/* ==================================================
-              HELP
-          ================================================== */}
-
           <section className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
             <CardHeader
               icon={CircleHelp}
@@ -1345,46 +1027,30 @@ export default function SettingsPage({ onLogout, user }) {
               title="Help & Support"
               subtitle={`Get help with your ${roleInfo.label.toLowerCase()} account`}
             />
-
             <div className="px-5 py-4 space-y-3">
               <div className="flex items-center gap-3 text-sm text-gray-600">
                 <Phone size={17} className="text-gray-400" />
-
                 <span>Helpline: +91 9999999990</span>
               </div>
-
               <div className="flex items-center gap-3 text-sm text-gray-600">
                 <Mail size={17} className="text-gray-400" />
-
                 <span>support@bharatfasal.in</span>
               </div>
             </div>
           </section>
-
-          {/* ==================================================
-              ABOUT
-          ================================================== */}
-
           <section className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
             <div className="flex items-center gap-3 px-5 py-4">
               <div className="w-9 h-9 rounded-lg bg-gray-100 text-gray-600 flex items-center justify-center">
                 <Info size={19} />
               </div>
-
               <div>
                 <h2 className="font-bold text-gray-900">About</h2>
-
                 <p className="text-sm text-gray-500 mt-0.5">
                   Bharat Fasal Version 1.0.0
                 </p>
               </div>
             </div>
           </section>
-
-          {/* ==================================================
-              LOGOUT
-          ================================================== */}
-
           <button
             type="button"
             onClick={onLogout}
@@ -1395,11 +1061,6 @@ export default function SettingsPage({ onLogout, user }) {
           </button>
         </div>
       </div>
-
-      {/* ======================================================
-          MODALS
-      ====================================================== */}
-
       {activeModal === "profile" && (
         <Modal
           title="Manage Profile"
@@ -1417,7 +1078,6 @@ export default function SettingsPage({ onLogout, user }) {
                 }))
               }
             />
-
             {isBuyer && (
               <InputField
                 label="Business / Company Name"
@@ -1430,7 +1090,6 @@ export default function SettingsPage({ onLogout, user }) {
                 }
               />
             )}
-
             <InputField
               label="Mobile Number"
               value={profile.phone}
@@ -1441,7 +1100,6 @@ export default function SettingsPage({ onLogout, user }) {
                 }))
               }
             />
-
             <InputField
               label="Email"
               value={profile.email}
@@ -1452,7 +1110,6 @@ export default function SettingsPage({ onLogout, user }) {
                 }))
               }
             />
-
             <InputField
               label="Location"
               value={profile.location}
@@ -1463,7 +1120,6 @@ export default function SettingsPage({ onLogout, user }) {
                 }))
               }
             />
-
             <ModalButton
               onClick={handleSaveProfile}
               icon={Save}
@@ -1472,11 +1128,6 @@ export default function SettingsPage({ onLogout, user }) {
           </div>
         </Modal>
       )}
-
-      {/* ======================================================
-          BUSINESS DETAILS
-      ====================================================== */}
-
       {activeModal === "business" && (
         <Modal
           title="Business Details"
@@ -1494,7 +1145,6 @@ export default function SettingsPage({ onLogout, user }) {
                 }))
               }
             />
-
             <InputField
               label="Business Type"
               value={businessDetails.businessType}
@@ -1505,7 +1155,6 @@ export default function SettingsPage({ onLogout, user }) {
                 }))
               }
             />
-
             <InputField
               label="GSTIN"
               value={businessDetails.gstin}
@@ -1517,7 +1166,6 @@ export default function SettingsPage({ onLogout, user }) {
               }
               placeholder="Enter GSTIN"
             />
-
             <InputField
               label="PAN"
               value={businessDetails.pan}
@@ -1529,7 +1177,6 @@ export default function SettingsPage({ onLogout, user }) {
               }
               placeholder="Enter PAN"
             />
-
             <TextAreaField
               label="Business Address"
               value={businessDetails.address}
@@ -1540,7 +1187,6 @@ export default function SettingsPage({ onLogout, user }) {
                 }))
               }
             />
-
             <ModalButton
               onClick={handleSaveBusiness}
               icon={Save}
@@ -1549,11 +1195,6 @@ export default function SettingsPage({ onLogout, user }) {
           </div>
         </Modal>
       )}
-
-      {/* ======================================================
-          DOCUMENTS
-      ====================================================== */}
-
       {activeModal === "documents" && (
         <Modal
           title="Business Documents"
@@ -1571,7 +1212,6 @@ export default function SettingsPage({ onLogout, user }) {
                 }))
               }
             />
-
             <DocumentCheck
               label="GST Registration"
               checked={documents.gst}
@@ -1582,7 +1222,6 @@ export default function SettingsPage({ onLogout, user }) {
                 }))
               }
             />
-
             <DocumentCheck
               label="Business Registration / Proof"
               checked={documents.businessProof}
@@ -1593,7 +1232,6 @@ export default function SettingsPage({ onLogout, user }) {
                 }))
               }
             />
-
             <DocumentCheck
               label="Bank Account Proof"
               checked={documents.bankProof}
@@ -1604,17 +1242,14 @@ export default function SettingsPage({ onLogout, user }) {
                 }))
               }
             />
-
             <div className="mt-4 p-3 rounded-lg bg-gray-50 border border-gray-200 text-xs text-gray-500 flex gap-2">
               <AlertCircle size={15} className="shrink-0 mt-0.5" />
-
               <span>
                 This prototype records document readiness. Real document upload
                 and KYC validation should be connected to secure backend storage
                 and verification services.
               </span>
             </div>
-
             <button
               type="button"
               onClick={() => setActiveModal("verification")}
@@ -1625,11 +1260,6 @@ export default function SettingsPage({ onLogout, user }) {
           </div>
         </Modal>
       )}
-
-      {/* ======================================================
-          VERIFICATION
-      ====================================================== */}
-
       {activeModal === "verification" && (
         <Modal
           title={isBuyer ? "Buyer Verification" : "Identity Verification"}
@@ -1657,7 +1287,6 @@ export default function SettingsPage({ onLogout, user }) {
                   </div>
                 </div>
               </div>
-
               <ReviewValue
                 label="Business"
                 value={businessDetails.businessName || "Not provided"}
@@ -1687,7 +1316,6 @@ export default function SettingsPage({ onLogout, user }) {
                     .join(", ") || "No documents marked"
                 }
               />
-
               <button
                 type="button"
                 onClick={submitVerification}
@@ -1713,7 +1341,6 @@ export default function SettingsPage({ onLogout, user }) {
                   </div>
                 </div>
               </div>
-
               <div>
                 <label className="text-xs font-semibold text-gray-700">
                   Document Type
@@ -1736,7 +1363,6 @@ export default function SettingsPage({ onLogout, user }) {
                   <option value="pan">PAN Card</option>
                 </select>
               </div>
-
               <div>
                 <label className="text-xs font-semibold text-gray-700">
                   Document Number
@@ -1768,7 +1394,6 @@ export default function SettingsPage({ onLogout, user }) {
                   <p className="text-xs text-red-600 mt-1.5">{identityError}</p>
                 )}
               </div>
-
               <div className="flex items-start gap-2 p-3 rounded-lg bg-gray-50 border border-gray-200">
                 <AlertCircle
                   size={15}
@@ -1780,26 +1405,20 @@ export default function SettingsPage({ onLogout, user }) {
                   admin review.
                 </p>
               </div>
-
               {!isVerificationPending && (
-  <button
-    type="button"
-    onClick={submitVerification}
-    className="w-full py-3 rounded-lg bg-green-600 hover:bg-green-700 text-white text-sm font-semibold flex items-center justify-center gap-2 transition"
-  >
-    <ShieldCheck size={17} />
-    Submit for Verification
-  </button>
-)}
+                <button
+                  type="button"
+                  onClick={submitVerification}
+                  className="w-full py-3 rounded-lg bg-green-600 hover:bg-green-700 text-white text-sm font-semibold flex items-center justify-center gap-2 transition"
+                >
+                  <ShieldCheck size={17} />
+                  Submit for Verification
+                </button>
+              )}
             </div>
           )}
         </Modal>
       )}
-
-      {/* ======================================================
-          PREFERENCES
-      ====================================================== */}
-
       {activeModal === "preferences" && (
         <Modal
           title="Procurement Preferences"
@@ -1817,7 +1436,6 @@ export default function SettingsPage({ onLogout, user }) {
                 }))
               }
             />
-
             <InputField
               label="Preferred Grade"
               value={preferences.grade}
@@ -1828,7 +1446,6 @@ export default function SettingsPage({ onLogout, user }) {
                 }))
               }
             />
-
             <InputField
               label="Typical Purchase Quantity"
               value={preferences.quantity}
@@ -1839,7 +1456,6 @@ export default function SettingsPage({ onLogout, user }) {
                 }))
               }
             />
-
             <InputField
               label="Preferred Delivery Location"
               value={preferences.location}
@@ -1850,12 +1466,10 @@ export default function SettingsPage({ onLogout, user }) {
                 }))
               }
             />
-
             <div>
               <label className="text-xs font-semibold text-gray-700">
                 Transportation
               </label>
-
               <select
                 value={preferences.transportation}
                 onChange={(e) =>
@@ -1867,11 +1481,9 @@ export default function SettingsPage({ onLogout, user }) {
                 className="w-full mt-1.5 h-11 px-3 rounded-lg border border-gray-200 bg-white text-sm outline-none focus:border-green-500"
               >
                 <option>I will arrange transportation</option>
-
                 <option>Seller should arrange transportation</option>
               </select>
             </div>
-
             <ModalButton
               onClick={handleSavePreferences}
               icon={Save}
@@ -1880,11 +1492,6 @@ export default function SettingsPage({ onLogout, user }) {
           </div>
         </Modal>
       )}
-
-      {/* ======================================================
-          PAYMENT
-      ====================================================== */}
-
       {activeModal === "payment" && (
         <Modal
           title={isBuyer ? "Payment Methods" : "Bank Account"}
@@ -1906,7 +1513,6 @@ export default function SettingsPage({ onLogout, user }) {
                 }))
               }
             />
-
             <InputField
               label="Account Number"
               value={paymentDetails.accountNumber}
@@ -1917,7 +1523,6 @@ export default function SettingsPage({ onLogout, user }) {
                 }))
               }
             />
-
             <InputField
               label="IFSC"
               value={paymentDetails.ifsc}
@@ -1928,7 +1533,6 @@ export default function SettingsPage({ onLogout, user }) {
                 }))
               }
             />
-
             <InputField
               label="UPI ID"
               value={paymentDetails.upi}
@@ -1940,7 +1544,6 @@ export default function SettingsPage({ onLogout, user }) {
               }
               placeholder="example@upi"
             />
-
             <ModalButton
               onClick={handleSavePayment}
               icon={Save}
@@ -1949,11 +1552,6 @@ export default function SettingsPage({ onLogout, user }) {
           </div>
         </Modal>
       )}
-
-      {/* ======================================================
-          PROTECTED PAYMENTS
-      ====================================================== */}
-
       {activeModal === "protected" && (
         <Modal
           title="Protected Payments"
@@ -1966,25 +1564,21 @@ export default function SettingsPage({ onLogout, user }) {
               title="Payment Secured"
               text="Buyer payment is marked as protected for the procurement order."
             />
-
             <ProtectedStep
               number="2"
               title="Quality & Quantity Verification"
               text="Order information and delivery evidence are checked."
             />
-
             <ProtectedStep
               number="3"
               title="Delivery Confirmation"
               text="Delivery and buyer inspection are completed."
             />
-
             <ProtectedStep
               number="4"
               title="Payment Release"
               text="Settlement is released after successful completion."
             />
-
             <div className="p-3 rounded-lg bg-amber-50 border border-amber-100 text-xs text-amber-800">
               Prototype only: actual escrow/payment holding requires a compliant
               payment provider and backend integration.
@@ -1992,11 +1586,6 @@ export default function SettingsPage({ onLogout, user }) {
           </div>
         </Modal>
       )}
-
-      {/* ======================================================
-          PAYMENT HISTORY
-      ====================================================== */}
-
       {activeModal === "history" && (
         <Modal
           title="Payment History"
@@ -2010,14 +1599,12 @@ export default function SettingsPage({ onLogout, user }) {
               amount="₹4,50,000"
               status="Protected"
             />
-
             <PaymentHistoryItem
               order="BF-ORD-1018"
               crop="Wheat"
               amount="₹3,20,000"
               status="Released"
             />
-
             <PaymentHistoryItem
               order="BF-ORD-1009"
               crop="Maize"
@@ -2030,11 +1617,6 @@ export default function SettingsPage({ onLogout, user }) {
     </div>
   );
 }
-
-// ============================================================
-// CARD HEADER
-// ============================================================
-
 function CardHeader({ icon: Icon, iconClass, iconBg, title, subtitle }) {
   return (
     <div className="flex items-center gap-3 px-5 py-4 border-b border-gray-100">
@@ -2049,41 +1631,30 @@ function CardHeader({ icon: Icon, iconClass, iconBg, title, subtitle }) {
       >
         <Icon size={19} />
       </div>
-
       <div>
         <h2 className="font-bold text-gray-900">{title}</h2>
-
         <p className="text-xs text-gray-500 mt-0.5">{subtitle}</p>
       </div>
     </div>
   );
 }
-
-// ============================================================
-// INFO ROW
-// ============================================================
-
 function InfoRow({ label, value, right, onClick }) {
   const content = (
     <div className="py-3.5">
       <div className="flex items-center justify-between gap-4">
         <div className="min-w-0">
           <p className="text-sm font-semibold text-gray-800">{label}</p>
-
           <p className="text-xs text-gray-500 mt-0.5 truncate">{value}</p>
         </div>
-
         {right}
       </div>
     </div>
   );
-
   if (!onClick) {
     return (
       <div className="border-b border-gray-100 last:border-b-0">{content}</div>
     );
   }
-
   return (
     <button
       type="button"
@@ -2094,11 +1665,6 @@ function InfoRow({ label, value, right, onClick }) {
     </button>
   );
 }
-
-// ============================================================
-// ACTION ROW
-// ============================================================
-
 function ActionRow({ icon: Icon, title, subtitle, onClick }) {
   return (
     <button
@@ -2107,36 +1673,22 @@ function ActionRow({ icon: Icon, title, subtitle, onClick }) {
       className="w-full flex items-center gap-3 px-5 py-4 text-left hover:bg-gray-50 transition"
     >
       <Icon size={18} className="text-gray-500 shrink-0" />
-
       <div className="flex-1 min-w-0">
         <p className="text-sm font-semibold text-gray-800">{title}</p>
-
         <p className="text-xs text-gray-500 mt-0.5">{subtitle}</p>
       </div>
-
       <ChevronRight size={17} className="text-gray-400 shrink-0" />
     </button>
   );
 }
-
-// ============================================================
-// PREFERENCE ROW
-// ============================================================
-
 function PreferenceRow({ label, value }) {
   return (
     <div className="py-3.5 border-b border-gray-100">
       <p className="text-[11px] text-gray-400">{label}</p>
-
       <p className="text-sm font-semibold text-gray-800 mt-1">{value}</p>
     </div>
   );
 }
-
-// ============================================================
-// VERIFICATION BADGE
-// ============================================================
-
 function VerificationBadge({ status }) {
   if (status === "approved") {
     return (
@@ -2145,7 +1697,6 @@ function VerificationBadge({ status }) {
       </span>
     );
   }
-
   if (status === "rejected") {
     return (
       <span className="px-2.5 py-1 rounded-full bg-red-50 text-red-700 text-xs font-semibold">
@@ -2153,18 +1704,12 @@ function VerificationBadge({ status }) {
       </span>
     );
   }
-
   return (
     <span className="px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 text-xs font-semibold">
       Verification Pending
     </span>
   );
 }
-
-// ============================================================
-// MODAL
-// ============================================================
-
 function Modal({ title, subtitle, children, onClose }) {
   return (
     <div
@@ -2179,10 +1724,8 @@ function Modal({ title, subtitle, children, onClose }) {
         <div className="flex items-start justify-between gap-4 px-5 py-4 border-b border-gray-100">
           <div>
             <h2 className="text-lg font-bold text-gray-900">{title}</h2>
-
             <p className="text-xs text-gray-500 mt-1">{subtitle}</p>
           </div>
-
           <button
             type="button"
             onClick={onClose}
@@ -2191,22 +1734,15 @@ function Modal({ title, subtitle, children, onClose }) {
             <X size={18} />
           </button>
         </div>
-
         <div className="p-5">{children}</div>
       </div>
     </div>
   );
 }
-
-// ============================================================
-// INPUT
-// ============================================================
-
 function InputField({ label, value, onChange, placeholder }) {
   return (
     <div>
       <label className="text-xs font-semibold text-gray-700">{label}</label>
-
       <input
         type="text"
         value={value}
@@ -2217,16 +1753,10 @@ function InputField({ label, value, onChange, placeholder }) {
     </div>
   );
 }
-
-// ============================================================
-// TEXT AREA
-// ============================================================
-
 function TextAreaField({ label, value, onChange }) {
   return (
     <div>
       <label className="text-xs font-semibold text-gray-700">{label}</label>
-
       <textarea
         value={value}
         onChange={(e) => onChange(e.target.value)}
@@ -2236,11 +1766,6 @@ function TextAreaField({ label, value, onChange }) {
     </div>
   );
 }
-
-// ============================================================
-// MODAL BUTTON
-// ============================================================
-
 function ModalButton({ onClick, icon: Icon, label }) {
   return (
     <button
@@ -2249,16 +1774,10 @@ function ModalButton({ onClick, icon: Icon, label }) {
       className="w-full mt-2 py-2.5 rounded-lg bg-green-600 hover:bg-green-700 text-white text-sm font-semibold flex items-center justify-center gap-2"
     >
       <Icon size={16} />
-
       {label}
     </button>
   );
 }
-
-// ============================================================
-// DOCUMENT CHECK
-// ============================================================
-
 function DocumentCheck({ label, checked, onChange }) {
   return (
     <label className="flex items-center gap-3 p-3 rounded-lg border border-gray-200 hover:bg-gray-50 cursor-pointer">
@@ -2268,69 +1787,46 @@ function DocumentCheck({ label, checked, onChange }) {
         onChange={(e) => onChange(e.target.checked)}
         className="w-4 h-4 accent-green-600"
       />
-
       <FileCheck size={17} className="text-gray-500" />
-
       <span className="text-sm font-medium text-gray-800">{label}</span>
     </label>
   );
 }
-
-// ============================================================
-// REVIEW VALUE
-// ============================================================
-
 function ReviewValue({ label, value }) {
   return (
     <div className="flex items-start justify-between gap-4 py-2 border-b border-gray-100">
       <span className="text-xs text-gray-500">{label}</span>
-
       <span className="text-sm font-semibold text-gray-800 text-right max-w-[65%] break-words">
         {value}
       </span>
     </div>
   );
 }
-
-// ============================================================
-// PROTECTED PAYMENT STEP
-// ============================================================
-
 function ProtectedStep({ number, title, text }) {
   return (
     <div className="flex items-start gap-3">
       <div className="w-8 h-8 rounded-full bg-green-50 text-green-700 flex items-center justify-center text-xs font-bold shrink-0">
         {number}
       </div>
-
       <div>
         <p className="text-sm font-semibold text-gray-900">{title}</p>
-
         <p className="text-xs text-gray-500 mt-1 leading-5">{text}</p>
       </div>
     </div>
   );
 }
-
-// ============================================================
-// PAYMENT HISTORY
-// ============================================================
-
 function PaymentHistoryItem({ order, crop, amount, status }) {
   return (
     <div className="flex items-center gap-3 p-3 rounded-xl border border-gray-200">
       <div className="w-10 h-10 rounded-lg bg-green-50 text-green-600 flex items-center justify-center">
         <IndianRupee size={18} />
       </div>
-
       <div className="flex-1 min-w-0">
         <p className="text-sm font-semibold text-gray-900">{order}</p>
-
         <p className="text-xs text-gray-500 mt-0.5">
           {crop} · {amount}
         </p>
       </div>
-
       <span
         className={`
           px-2 py-1
