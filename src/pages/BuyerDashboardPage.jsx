@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 
@@ -8,7 +8,6 @@ import {
   ChevronRight,
   CircleDollarSign,
   Handshake,
-  IndianRupee,
   MapPin,
   Package,
   Plus,
@@ -27,12 +26,6 @@ import {
   CheckCircle2,
 } from "lucide-react";
 
-import { mandiPrices } from "../data/mockPrices";
-import { demandBoard } from "../data/mockBuyers";
-import { commodities } from "../data/mockCommodities";
-import { myLots } from "../data/mockLots";
-import { payments } from "../data/mockLogistics";
-
 import {
   formatCurrency,
   getStatusColor,
@@ -47,107 +40,102 @@ export default function BuyerDashboardPage({ user }) {
   // USER
   // =====================================================
 
-  const buyerName =
-    user?.name || "Buyer";
+  const buyerName = user?.name || "Buyer";
 
-  const companyName =
-    user?.companyName || "Buyer Organization";
+  const companyName = user?.companyName || "Buyer Organization";
 
-  const buyerLocation =
-    user?.location || "India";
+  const buyerLocation = user?.location || "India";
 
   // Prototype verification status.
-  const isVerified =
-    user?.verificationStatus !== "unverified";
+  const isVerified = user?.verificationStatus !== "unverified";
 
   // =====================================================
   // MODALS
   // =====================================================
 
-  const [verificationOpen, setVerificationOpen] =
-    useState(false);
+  const [verificationOpen, setVerificationOpen] = useState(false);
 
-  const [questionOpen, setQuestionOpen] =
-    useState(false);
+  const [questionOpen, setQuestionOpen] = useState(false);
 
-  const [selectedOrder, setSelectedOrder] =
-    useState(null);
+  const [selectedOrder, setSelectedOrder] = useState(null);
 
-  const [questionType, setQuestionType] =
-    useState("Quantity mismatch");
+  const [questionType, setQuestionType] = useState("Quantity mismatch");
 
-  const [questionText, setQuestionText] =
-    useState("");
+  const [questionText, setQuestionText] = useState("");
 
-  const [questionSubmitted, setQuestionSubmitted] =
-    useState(false);
+  const [questionSubmitted, setQuestionSubmitted] = useState(false);
 
   // =====================================================
-  // DATA
+  // REAL DATA
   // =====================================================
 
-  const getCommodity = (id) =>
-    commodities.find(
-      (commodity) => commodity.id === id
+  const [activeDemands, setActiveDemands] = useState([]);
+  const [availableLots, setAvailableLots] = useState([]);
+  const [marketWatch, setMarketWatch] = useState([]);
+  const [recentProcurement, setRecentProcurement] = useState([]);
+
+  useEffect(() => {
+    const read = (key) => {
+      try {
+        return JSON.parse(localStorage.getItem(key) || "[]");
+      } catch {
+        return [];
+      }
+    };
+
+    setActiveDemands(
+      read("bf_buyer_demands").filter(
+        (d) => d.buyerId === user?.id && d.status !== "closed",
+      ),
     );
 
-  const activeDemands =
-    demandBoard.slice(0, 4);
+    setAvailableLots(
+      read("bf_seller_lots")
+        .filter((lot) => lot.status === "listed")
+        .slice(0, 4),
+    );
 
-  const availableLots =
-    myLots
-      .filter((lot) => lot.status === "listed")
-      .slice(0, 4);
+    setRecentProcurement(
+      read("bf_buyer_orders")
+        .filter((order) => order.buyerId === user?.id)
+        .slice(0, 3),
+    );
 
-  const marketWatch =
-    mandiPrices.slice(0, 4);
+    const fetchPrices = async () => {
+      try {
+        const response = await fetch(
+          "https://bharat-fasal.onrender.com/api/mandi-prices?limit=4",
+        );
+        const data = await response.json();
 
-  // =====================================================
-  // RECENT PROCUREMENT
-  // =====================================================
-  // Demo data for prototype.
-  // Lot ID is deliberately shown here because
-  // disputes must identify the exact lot.
+        if (!response.ok || !Array.isArray(data.records)) return;
 
-  const recentProcurement = [
-    {
-      id: "BF-ORD-1024",
-      lotId: "BF-LOT-10452",
-      commodity: "Wheat",
-      quantity: "500 Quintals",
-      amount: 1250000,
-      status: "Delivered",
-      payment: "Protected",
-      quality: "Verified",
-      transport: "Buyer arranged",
-      date: "28 Aug 2026",
-    },
-    {
-      id: "BF-ORD-1021",
-      lotId: "BF-LOT-10431",
-      commodity: "Rice",
-      quantity: "300 Quintals",
-      amount: 870000,
-      status: "In Transit",
-      payment: "Protected",
-      quality: "Verified",
-      transport: "Seller arranged",
-      date: "30 Aug 2026",
-    },
-    {
-      id: "BF-ORD-1018",
-      lotId: "BF-LOT-10408",
-      commodity: "Tomato",
-      quantity: "120 Quintals",
-      amount: 312000,
-      status: "Delivered",
-      payment: "Released",
-      quality: "Verified",
-      transport: "Buyer arranged",
-      date: "26 Aug 2026",
-    },
-  ];
+        setMarketWatch(
+          data.records
+            .map((item) => ({
+              commodityId: item.commodity || item.Commodity || "",
+              mandi: item.market || item.Market || "",
+              price: Number(item.modal_price || item.Modal_Price || 0),
+              change: Number(item.change || 0),
+            }))
+            .filter((item) => item.commodityId && item.price > 0),
+        );
+      } catch (error) {
+        console.error("Mandi price fetch error:", error);
+      }
+    };
 
+    fetchPrices();
+  }, [user?.id]);
+
+  const matchedLots = availableLots.filter((lot) =>
+    activeDemands.some((demand) => demand.crop === lot.commodityId),
+  );
+
+  const totalPurchased = recentProcurement.reduce(
+    (sum, order) => sum + Number(order.amount || 0),
+    0,
+  );
   // =====================================================
   // QUICK ACTIONS
   // =====================================================
@@ -217,7 +205,6 @@ export default function BuyerDashboardPage({ user }) {
 
   return (
     <div className="w-full max-w-[1500px] mx-auto px-4 sm:px-6 lg:px-8 space-y-7 pb-10">
-
       {/* =====================================================
           BUYER HEADER
       ===================================================== */}
@@ -233,7 +220,6 @@ export default function BuyerDashboardPage({ user }) {
           bg-gray-900
         "
       >
-
         {/* Buyer / business background */}
 
         <div
@@ -271,9 +257,7 @@ export default function BuyerDashboardPage({ user }) {
             py-6
           "
         >
-
           <div>
-
             <div className="mb-2 flex items-center gap-2 text-xs font-medium text-gray-500">
               <span>Buyer Dashboard</span>
               <span className="text-gray-300">/</span>
@@ -295,7 +279,6 @@ export default function BuyerDashboardPage({ user }) {
             {/* LOCATION + VERIFICATION */}
 
             <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
-
               <span className="inline-flex items-center gap-1.5 text-gray-600">
                 <MapPin size={15} />
                 {buyerLocation}
@@ -304,9 +287,7 @@ export default function BuyerDashboardPage({ user }) {
               {isVerified && (
                 <button
                   type="button"
-                  onClick={() =>
-                    setVerificationOpen(true)
-                  }
+                  onClick={() => setVerificationOpen(true)}
                   className="
                     inline-flex
                     items-center
@@ -321,18 +302,14 @@ export default function BuyerDashboardPage({ user }) {
                   Verified Buyer
                 </button>
               )}
-
             </div>
-
           </div>
 
           {/* POST DEMAND */}
 
           <button
             type="button"
-            onClick={() =>
-              navigate("/buyers")
-            }
+            onClick={() => navigate("/buyers")}
             className="
               inline-flex
               w-fit
@@ -353,9 +330,7 @@ export default function BuyerDashboardPage({ user }) {
             <Plus size={17} />
             Post New Demand
           </button>
-
         </div>
-
       </section>
 
       {/* =====================================================
@@ -363,98 +338,74 @@ export default function BuyerDashboardPage({ user }) {
       ===================================================== */}
 
       <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-
         {/* ACTIVE DEMANDS */}
 
         <div className="rounded-xl border border-gray-200 bg-white px-4 py-4">
-
           <div className="flex items-center justify-between">
-
             <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-50 text-blue-600">
               <Package size={19} />
             </div>
-
           </div>
 
           <p className="mt-4 text-2xl font-bold text-gray-900">
-            6
+            {activeDemands.length}
           </p>
 
-          <p className="mt-1 text-sm text-gray-500">
-            Active Demands
-          </p>
-
+          <p className="mt-1 text-sm text-gray-500">Active Demands</p>
         </div>
 
         {/* MATCHED LOTS */}
 
         <div className="rounded-xl border border-gray-200 bg-white px-4 py-4">
-
           <div className="flex items-center justify-between">
-
             <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-green-50 text-green-600">
               <Handshake size={19} />
             </div>
-
           </div>
 
           <p className="mt-4 text-2xl font-bold text-gray-900">
-            24
+            {matchedLots.length}
           </p>
 
-          <p className="mt-1 text-sm text-gray-500">
-            Lots Matched
-          </p>
-
+          <p className="mt-1 text-sm text-gray-500">Lots Matched</p>
         </div>
 
         {/* PURCHASED */}
 
         <div className="rounded-xl border border-gray-200 bg-white px-4 py-4">
-
           <div className="flex items-center justify-between">
-
             <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-amber-50 text-amber-600">
               <CircleDollarSign size={19} />
             </div>
-
           </div>
 
           <p className="mt-4 text-xl font-bold text-gray-900 sm:text-2xl">
-            {formatCurrency(1250000)}
+            {formatCurrency(totalPurchased)}
           </p>
 
-          <p className="mt-1 text-sm text-gray-500">
-            Total Purchased
-          </p>
-
+          <p className="mt-1 text-sm text-gray-500">Total Purchased</p>
         </div>
 
         {/* RATING */}
 
         <div className="rounded-xl border border-gray-200 bg-white px-4 py-4">
-
           <div className="flex items-center justify-between">
-
             <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-purple-50 text-purple-600">
               <Star size={19} />
             </div>
-
           </div>
 
           <p className="mt-4 text-2xl font-bold text-gray-900">
-            4.5
-            <span className="ml-1 text-sm font-normal text-gray-400">
-              / 5
-            </span>
+            {user?.rating ?? "—"}
+            {user?.rating != null && (
+              <span className="ml-1 text-sm font-normal text-gray-400">
+                / 5
+              </span>
+            )}
           </p>
 
-          <p className="mt-1 text-sm text-gray-500">
-            Buyer Rating
-          </p>
-
+          <p className="mt-1 text-sm text-gray-500">Buyer Rating</p>
         </div>
-
       </section>
 
       {/* =====================================================
@@ -462,32 +413,23 @@ export default function BuyerDashboardPage({ user }) {
       ===================================================== */}
 
       <section>
-
         <div className="mb-3">
-
-          <h2 className="text-lg font-bold text-gray-900">
-            Quick Actions
-          </h2>
+          <h2 className="text-lg font-bold text-gray-900">Quick Actions</h2>
 
           <p className="mt-0.5 text-sm text-gray-500">
             Common procurement activities
           </p>
-
         </div>
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-
           {quickActions.map((action) => {
-
             const Icon = action.icon;
 
             return (
               <button
                 key={action.title}
                 type="button"
-                onClick={() =>
-                  navigate(action.path)
-                }
+                onClick={() => navigate(action.path)}
                 className="
                   group
                   flex
@@ -504,13 +446,11 @@ export default function BuyerDashboardPage({ user }) {
                   hover:shadow-sm
                 "
               >
-
                 <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-gray-50 text-gray-600 group-hover:bg-green-50 group-hover:text-green-600">
                   <Icon size={19} />
                 </div>
 
                 <div className="min-w-0 flex-1">
-
                   <p className="text-sm font-semibold text-gray-900">
                     {action.title}
                   </p>
@@ -518,21 +458,16 @@ export default function BuyerDashboardPage({ user }) {
                   <p className="mt-0.5 text-xs text-gray-500">
                     {action.description}
                   </p>
-
                 </div>
 
                 <ChevronRight
                   size={16}
                   className="text-gray-300 group-hover:text-gray-500"
                 />
-
               </button>
             );
-
           })}
-
         </div>
-
       </section>
 
       {/* =====================================================
@@ -540,15 +475,11 @@ export default function BuyerDashboardPage({ user }) {
       ===================================================== */}
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
-
         {/* ACTIVE DEMANDS */}
 
         <section className="xl:col-span-2">
-
           <div className="mb-3 flex items-end justify-between">
-
             <div>
-
               <h2 className="text-lg font-bold text-gray-900">
                 My Active Demands
               </h2>
@@ -556,29 +487,21 @@ export default function BuyerDashboardPage({ user }) {
               <p className="mt-0.5 text-sm text-gray-500">
                 Current procurement requirements
               </p>
-
             </div>
 
             <button
               type="button"
-              onClick={() =>
-                navigate("/buyers")
-              }
+              onClick={() => navigate("/buyers")}
               className="text-sm font-semibold text-green-700 hover:text-green-800"
             >
               View all
             </button>
-
           </div>
 
           <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
-
-            {activeDemands.map(
-              (demand, index) => {
-
-                const isUrgent =
-                  demand.status?.toLowerCase() ===
-                  "urgent";
+            {activeDemands.length ? (
+              activeDemands.map((demand, index) => {
+                const isUrgent = demand.status?.toLowerCase() === "urgent";
 
                 return (
                   <div
@@ -586,31 +509,21 @@ export default function BuyerDashboardPage({ user }) {
                     className={`
                       p-4
                       ${
-                        index !==
-                        activeDemands.length - 1
+                        index !== activeDemands.length - 1
                           ? "border-b border-gray-100"
                           : ""
                       }
-                      ${
-                        isUrgent
-                          ? "bg-red-50/30"
-                          : ""
-                      }
+                      ${isUrgent ? "bg-red-50/30" : ""}
                     `}
                   >
-
                     <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-
                       <div className="flex items-start gap-3">
-
                         <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-amber-50 text-amber-600">
                           <Package size={18} />
                         </div>
 
                         <div>
-
                           <div className="flex flex-wrap items-center gap-2">
-
                             <h3 className="font-semibold text-gray-900">
                               {t(demand.commodityId)}
                             </h3>
@@ -623,108 +536,77 @@ export default function BuyerDashboardPage({ user }) {
                                 text-[11px]
                                 font-semibold
                                 capitalize
-                                ${getStatusColor(
-                                  demand.status
-                                )}
+                                ${getStatusColor(demand.status)}
                               `}
                             >
                               {demand.status}
                             </span>
-
                           </div>
 
                           <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500">
+                            <span>{demand.quantity}</span>
 
-                            <span>
-                              {demand.quantity}
-                            </span>
-
-                            <span>
-                              Grade {demand.grade}
-                            </span>
+                            <span>Grade {demand.grade}</span>
 
                             <span className="inline-flex items-center gap-1">
                               <CalendarDays size={12} />
                               By{" "}
-                              {new Date(
-                                demand.deadline
-                              ).toLocaleDateString(
+                              {new Date(demand.deadline).toLocaleDateString(
                                 "en-IN",
                                 {
                                   day: "numeric",
                                   month: "short",
-                                }
+                                },
                               )}
                             </span>
-
                           </div>
-
                         </div>
-
                       </div>
 
                       <div className="text-left sm:text-right">
-
                         <p className="text-lg font-bold text-gray-900">
-                          {formatCurrency(
-                            demand.priceOffered
-                          )}
+                          {formatCurrency(demand.priceOffered)}
                         </p>
 
-                        <p className="text-xs text-gray-500">
-                          per quintal
-                        </p>
-
+                        <p className="text-xs text-gray-500">per quintal</p>
                       </div>
-
                     </div>
-
                   </div>
                 );
-              }
+              })
+            ) : (
+              <p className="p-6 text-sm text-gray-500">
+                No active demands yet. Post a demand to see it here.
+              </p>
             )}
-
           </div>
-
         </section>
 
         {/* MARKET WATCH */}
 
         <section>
-
           <div className="mb-3 flex items-end justify-between">
-
             <div>
-
-              <h2 className="text-lg font-bold text-gray-900">
-                Market Watch
-              </h2>
+              <h2 className="text-lg font-bold text-gray-900">Market Watch</h2>
 
               <p className="mt-0.5 text-sm text-gray-500">
                 Latest mandi prices
               </p>
-
             </div>
 
             <button
               type="button"
-              onClick={() =>
-                navigate("/prices")
-              }
+              onClick={() => navigate("/prices")}
               className="text-sm font-semibold text-green-700"
             >
               View all
             </button>
-
           </div>
 
           <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
-
-            {marketWatch.map(
-              (price, index) => {
-
-                const change =
-                  Number(price.change || 0);
+            {marketWatch.length ? (
+              marketWatch.map((price, index) => {
+                const change = Number(price.change || 0);
 
                 return (
                   <div
@@ -736,22 +618,18 @@ export default function BuyerDashboardPage({ user }) {
                       gap-3
                       p-4
                       ${
-                        index !==
-                        marketWatch.length - 1
+                        index !== marketWatch.length - 1
                           ? "border-b border-gray-100"
                           : ""
                       }
                     `}
                   >
-
                     <div className="flex min-w-0 items-center gap-3">
-
                       <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-green-50 text-green-600">
                         <Store size={17} />
                       </div>
 
                       <div className="min-w-0">
-
                         <p className="truncate text-sm font-semibold text-gray-900">
                           {t(price.commodityId)}
                         </p>
@@ -759,17 +637,12 @@ export default function BuyerDashboardPage({ user }) {
                         <p className="mt-0.5 truncate text-xs text-gray-500">
                           {price.mandi}
                         </p>
-
                       </div>
-
                     </div>
 
                     <div className="flex-shrink-0 text-right">
-
                       <p className="text-sm font-bold text-gray-900">
-                        {formatCurrency(
-                          price.price
-                        )}
+                        {formatCurrency(price.price)}
                       </p>
 
                       <span
@@ -779,35 +652,27 @@ export default function BuyerDashboardPage({ user }) {
                           gap-0.5
                           text-[11px]
                           font-semibold
-                          ${
-                            change >= 0
-                              ? "text-green-600"
-                              : "text-red-500"
-                          }
+                          ${change >= 0 ? "text-green-600" : "text-red-500"}
                         `}
                       >
-
                         {change >= 0 ? (
                           <TrendingUp size={11} />
                         ) : (
                           <TrendingDown size={11} />
                         )}
-
                         {Math.abs(change).toFixed(1)}%
-
                       </span>
-
                     </div>
-
                   </div>
                 );
-              }
+              })
+            ) : (
+              <p className="p-6 text-sm text-gray-500">
+                No market prices available right now.
+              </p>
             )}
-
           </div>
-
         </section>
-
       </div>
 
       {/* =====================================================
@@ -815,42 +680,28 @@ export default function BuyerDashboardPage({ user }) {
       ===================================================== */}
 
       <section>
-
         <div className="mb-3 flex items-end justify-between">
-
           <div>
-
-            <h2 className="text-lg font-bold text-gray-900">
-              Available Lots
-            </h2>
+            <h2 className="text-lg font-bold text-gray-900">Available Lots</h2>
 
             <p className="mt-0.5 text-sm text-gray-500">
               Produce currently listed by farmers
             </p>
-
           </div>
 
           <button
             type="button"
-            onClick={() =>
-              navigate("/lots")
-            }
+            onClick={() => navigate("/lots")}
             className="inline-flex items-center gap-1 text-sm font-semibold text-green-700"
           >
             Browse all
             <ChevronRight size={15} />
           </button>
-
         </div>
 
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
-
-          {availableLots.map((lot) => {
-
-            const commodity =
-              getCommodity(lot.commodityId);
-
-            return (
+          {availableLots.length ? (
+            availableLots.map((lot) => (
               <div
                 key={lot.id}
                 className="
@@ -864,9 +715,7 @@ export default function BuyerDashboardPage({ user }) {
                   hover:shadow-sm
                 "
               >
-
                 <div className="flex items-start justify-between">
-
                   <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-green-50 text-green-600">
                     <Package size={17} />
                   </div>
@@ -874,7 +723,6 @@ export default function BuyerDashboardPage({ user }) {
                   <span className="rounded-full bg-green-50 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-green-700">
                     Listed
                   </span>
-
                 </div>
 
                 <h3 className="mt-4 font-semibold text-gray-900">
@@ -896,32 +744,21 @@ export default function BuyerDashboardPage({ user }) {
                 </p>
 
                 <div className="mt-4 flex items-end justify-between border-t border-gray-100 pt-3">
-
                   <div>
-
-                    <p className="text-[11px] text-gray-400">
-                      Expected price
-                    </p>
+                    <p className="text-[11px] text-gray-400">Expected price</p>
 
                     <p className="mt-0.5 text-base font-bold text-gray-900">
-
-                      {formatCurrency(
-                        lot.expectedPrice
-                      )}
+                      {formatCurrency(lot.expectedPrice)}
 
                       <span className="ml-1 text-xs font-normal text-gray-400">
                         /q
                       </span>
-
                     </p>
-
                   </div>
 
                   <button
                     type="button"
-                    onClick={() =>
-                      navigate("/lots")
-                    }
+                    onClick={() => navigate("/lots")}
                     className="
                       rounded-lg
                       bg-green-600
@@ -935,15 +772,15 @@ export default function BuyerDashboardPage({ user }) {
                   >
                     Make Offer
                   </button>
-
                 </div>
-
               </div>
-            );
-          })}
-
+            ))
+          ) : (
+            <p className="p-6 text-sm text-gray-500">
+              No farmer lots are currently listed.
+            </p>
+          )}
         </div>
-
       </section>
 
       {/* =====================================================
@@ -951,11 +788,8 @@ export default function BuyerDashboardPage({ user }) {
       ===================================================== */}
 
       <section>
-
         <div className="mb-3 flex items-end justify-between">
-
           <div>
-
             <h2 className="text-lg font-bold text-gray-900">
               Recent Procurement
             </h2>
@@ -963,147 +797,106 @@ export default function BuyerDashboardPage({ user }) {
             <p className="mt-0.5 text-sm text-gray-500">
               Orders, lots, payment and delivery status
             </p>
-
           </div>
 
           <button
             type="button"
-            onClick={() =>
-              navigate("/payments")
-            }
+            onClick={() => navigate("/payments")}
             className="text-sm font-semibold text-green-700"
           >
             View all
           </button>
-
         </div>
 
         <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
-
-          {recentProcurement.map(
-            (order, index) => (
-
+          {recentProcurement.length ? (
+            recentProcurement.map((order, index) => (
               <div
-                key={order.id}
+                key={order.id || order.orderId || "—"}
                 className={`
                   p-4
                   ${
-                    index !==
-                    recentProcurement.length - 1
+                    index !== recentProcurement.length - 1
                       ? "border-b border-gray-100"
                       : ""
                   }
                 `}
               >
-
                 <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-
                   {/* ORDER INFO */}
 
                   <div className="flex items-start gap-3">
-
                     <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-blue-50 text-blue-600">
                       <Package size={18} />
                     </div>
 
                     <div>
-
                       <div className="flex flex-wrap items-center gap-2">
-
                         <h3 className="font-semibold text-gray-900">
-                          {order.commodity}
+                          {order.commodity || order.crop || "Crop"}
                         </h3>
 
                         <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-semibold text-gray-600">
                           {order.status}
                         </span>
-
                       </div>
 
                       <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500">
-
-                        <span>
-                          Order ID: {order.id}
-                        </span>
+                        <span>Order ID: {order.id}</span>
 
                         <span className="font-semibold text-green-700">
-                          Lot ID: {order.lotId}
+                          Lot ID: {order.lotId || "—"}
                         </span>
 
-                        <span>
-                          {order.quantity}
-                        </span>
-
+                        <span>{order.quantity || "—"}</span>
                       </div>
-
                     </div>
-
                   </div>
 
                   {/* STATUS */}
 
                   <div className="grid grid-cols-2 gap-4 text-xs sm:grid-cols-4 xl:min-w-[520px]">
-
                     <div>
-
-                      <p className="text-gray-400">
-                        Payment
-                      </p>
+                      <p className="text-gray-400">Payment</p>
 
                       <p className="mt-1 flex items-center gap-1 font-semibold text-gray-700">
                         <ShieldCheck size={13} className="text-green-600" />
-                        {order.payment}
+                        {order.payment || order.paymentStatus || "—"}
                       </p>
-
                     </div>
 
                     <div>
-
-                      <p className="text-gray-400">
-                        Quality
-                      </p>
+                      <p className="text-gray-400">Quality</p>
 
                       <p className="mt-1 flex items-center gap-1 font-semibold text-gray-700">
                         <CheckCircle2 size={13} className="text-green-600" />
-                        {order.quality}
+                        {order.quality || order.qualityStatus || "—"}
                       </p>
-
                     </div>
 
                     <div>
-
-                      <p className="text-gray-400">
-                        Transportation
-                      </p>
+                      <p className="text-gray-400">Transportation</p>
 
                       <p className="mt-1 flex items-center gap-1 font-semibold text-gray-700">
                         <Truck size={13} className="text-gray-500" />
-                        {order.transport}
+                        {order.transport || order.transportation || "—"}
                       </p>
-
                     </div>
 
                     <div>
-
-                      <p className="text-gray-400">
-                        Amount
-                      </p>
+                      <p className="text-gray-400">Amount</p>
 
                       <p className="mt-1 font-bold text-gray-900">
-                        {formatCurrency(order.amount)}
+                        {formatCurrency(Number(order.amount || 0))}
                       </p>
-
                     </div>
-
                   </div>
 
                   {/* QUESTION */}
 
                   <button
                     type="button"
-                    onClick={() =>
-                      openQuestion(order)
-                    }
+                    onClick={() => openQuestion(order)}
                     className="
                       inline-flex
                       w-fit
@@ -1126,16 +919,15 @@ export default function BuyerDashboardPage({ user }) {
                     <AlertCircle size={15} />
                     Raise a Question
                   </button>
-
                 </div>
-
               </div>
-
-            )
+            ))
+          ) : (
+            <p className="p-6 text-sm text-gray-500">
+              No procurement orders yet.
+            </p>
           )}
-
         </div>
-
       </section>
 
       {/* =====================================================
@@ -1143,15 +935,10 @@ export default function BuyerDashboardPage({ user }) {
       ===================================================== */}
 
       {verificationOpen && (
-
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 px-4">
-
           <div className="w-full max-w-lg rounded-2xl bg-white shadow-2xl">
-
             <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
-
               <div>
-
                 <h2 className="text-lg font-bold text-gray-900">
                   Buyer Verification
                 </h2>
@@ -1159,84 +946,55 @@ export default function BuyerDashboardPage({ user }) {
                 <p className="text-xs text-gray-500 mt-1">
                   Trust information for this buyer
                 </p>
-
               </div>
 
               <button
                 type="button"
-                onClick={() =>
-                  setVerificationOpen(false)
-                }
+                onClick={() => setVerificationOpen(false)}
                 className="rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-700"
               >
                 <X size={19} />
               </button>
-
             </div>
 
             <div className="p-5">
-
               <div className="flex items-center gap-3 rounded-xl bg-green-50 border border-green-100 p-4">
-
                 <div className="flex h-11 w-11 items-center justify-center rounded-full bg-white text-green-600">
                   <BadgeCheck size={24} />
                 </div>
 
                 <div>
+                  <p className="font-bold text-gray-900">Verified Buyer</p>
 
-                  <p className="font-bold text-gray-900">
-                    Verified Buyer
-                  </p>
-
-                  <p className="text-sm text-gray-600">
-                    {companyName}
-                  </p>
-
+                  <p className="text-sm text-gray-600">{companyName}</p>
                 </div>
-
               </div>
 
               <div className="mt-5 space-y-3">
-
                 {[
                   ["Account", buyerName],
                   ["Organization", companyName],
                   ["Mobile", user?.phone || "Verified"],
                   ["Location", buyerLocation],
-                  ["Buyer Rating", "4.5 / 5"],
-                  ["Completed Purchases", "24"],
-                  ["Disputes", "0"],
+                  ["Buyer Rating", user?.rating ? `${user.rating} / 5` : "—"],
+                  ["Completed Purchases", String(recentProcurement.length)],
+                  ["Disputes", "—"],
                 ].map(([label, value]) => (
-
                   <div
                     key={label}
                     className="flex items-center justify-between border-b border-gray-100 pb-3"
                   >
-
-                    <span className="text-sm text-gray-500">
-                      {label}
-                    </span>
+                    <span className="text-sm text-gray-500">{label}</span>
 
                     <span className="text-sm font-semibold text-gray-900 text-right">
                       {value}
                     </span>
-
                   </div>
-
                 ))}
-
               </div>
-
-              <p className="mt-4 text-xs text-gray-400">
-                Verification details shown here are demo data for the prototype.
-              </p>
-
             </div>
-
           </div>
-
         </div>
-
       )}
 
       {/* =====================================================
@@ -1244,18 +1002,12 @@ export default function BuyerDashboardPage({ user }) {
       ===================================================== */}
 
       {questionOpen && selectedOrder && (
-
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 px-4">
-
           <div className="w-full max-w-lg rounded-2xl bg-white shadow-2xl">
-
             {!questionSubmitted ? (
               <>
-
                 <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
-
                   <div>
-
                     <h2 className="text-lg font-bold text-gray-900">
                       Raise a Question
                     </h2>
@@ -1263,83 +1015,60 @@ export default function BuyerDashboardPage({ user }) {
                     <p className="text-xs text-gray-500 mt-1">
                       Report an issue with this procurement
                     </p>
-
                   </div>
 
                   <button
                     type="button"
-                    onClick={() =>
-                      setQuestionOpen(false)
-                    }
+                    onClick={() => setQuestionOpen(false)}
                     className="rounded-lg p-2 text-gray-400 hover:bg-gray-100"
                   >
                     <X size={19} />
                   </button>
-
                 </div>
 
                 <div className="p-5">
-
                   {/* ORDER / LOT */}
 
                   <div className="rounded-xl bg-gray-50 border border-gray-200 p-4">
-
                     <div className="flex items-center gap-2">
-
-                      <FileWarning
-                        size={17}
-                        className="text-gray-600"
-                      />
+                      <FileWarning size={17} className="text-gray-600" />
 
                       <p className="text-sm font-semibold text-gray-900">
-                        {selectedOrder.commodity}
+                        {selectedOrder.commodity ||
+                          selectedOrder.crop ||
+                          "Crop"}
                       </p>
-
                     </div>
 
                     <div className="mt-2 grid grid-cols-2 gap-3 text-xs">
-
                       <div>
-
-                        <p className="text-gray-400">
-                          Order ID
-                        </p>
+                        <p className="text-gray-400">Order ID</p>
 
                         <p className="mt-1 font-semibold text-gray-700">
-                          {selectedOrder.id}
+                          {selectedOrder.id || selectedOrder.orderId || "—"}
                         </p>
-
                       </div>
 
                       <div>
-
-                        <p className="text-gray-400">
-                          Lot ID
-                        </p>
+                        <p className="text-gray-400">Lot ID</p>
 
                         <p className="mt-1 font-semibold text-green-700">
-                          {selectedOrder.lotId}
+                          {selectedOrder.lotId || "—"}
                         </p>
-
                       </div>
-
                     </div>
-
                   </div>
 
                   {/* ISSUE TYPE */}
 
                   <div className="mt-5">
-
                     <label className="block text-sm font-semibold text-gray-800 mb-2">
                       What is the issue?
                     </label>
 
                     <select
                       value={questionType}
-                      onChange={(e) =>
-                        setQuestionType(e.target.value)
-                      }
+                      onChange={(e) => setQuestionType(e.target.value)}
                       className="
                         w-full
                         h-11
@@ -1354,48 +1083,30 @@ export default function BuyerDashboardPage({ user }) {
                         focus:ring-green-100
                       "
                     >
+                      <option>Quantity mismatch</option>
 
-                      <option>
-                        Quantity mismatch
-                      </option>
+                      <option>Quality issue</option>
 
-                      <option>
-                        Quality issue
-                      </option>
+                      <option>Delivery problem</option>
 
-                      <option>
-                        Delivery problem
-                      </option>
+                      <option>Payment issue</option>
 
-                      <option>
-                        Payment issue
-                      </option>
+                      <option>Damaged produce</option>
 
-                      <option>
-                        Damaged produce
-                      </option>
-
-                      <option>
-                        Other
-                      </option>
-
+                      <option>Other</option>
                     </select>
-
                   </div>
 
                   {/* DESCRIPTION */}
 
                   <div className="mt-4">
-
                     <label className="block text-sm font-semibold text-gray-800 mb-2">
                       Describe the issue
                     </label>
 
                     <textarea
                       value={questionText}
-                      onChange={(e) =>
-                        setQuestionText(e.target.value)
-                      }
+                      onChange={(e) => setQuestionText(e.target.value)}
                       rows={4}
                       placeholder="Explain what happened..."
                       className="
@@ -1413,18 +1124,14 @@ export default function BuyerDashboardPage({ user }) {
                         focus:ring-green-100
                       "
                     />
-
                   </div>
 
                   {/* ACTIONS */}
 
                   <div className="mt-5 flex justify-end gap-3">
-
                     <button
                       type="button"
-                      onClick={() =>
-                        setQuestionOpen(false)
-                      }
+                      onClick={() => setQuestionOpen(false)}
                       className="
                         rounded-lg
                         border
@@ -1456,16 +1163,11 @@ export default function BuyerDashboardPage({ user }) {
                     >
                       Submit Question
                     </button>
-
                   </div>
-
                 </div>
-
               </>
             ) : (
-
               <div className="p-7 text-center">
-
                 <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-green-50 text-green-600">
                   <CheckCircle2 size={30} />
                 </div>
@@ -1479,18 +1181,17 @@ export default function BuyerDashboardPage({ user }) {
                 </p>
 
                 <p className="mt-2 text-sm font-semibold text-gray-900">
-                  Lot ID: {selectedOrder.lotId}
+                  Lot ID: {selectedOrder.lotId || "—"}
                 </p>
 
                 <p className="mt-1 text-xs text-gray-400">
-                  Prototype dispute reference: BF-DSP-{Date.now().toString().slice(-5)}
+                  Prototype dispute reference: BF-DSP-
+                  {Date.now().toString().slice(-5)}
                 </p>
 
                 <button
                   type="button"
-                  onClick={() =>
-                    setQuestionOpen(false)
-                  }
+                  onClick={() => setQuestionOpen(false)}
                   className="
                     mt-6
                     rounded-lg
@@ -1505,17 +1206,11 @@ export default function BuyerDashboardPage({ user }) {
                 >
                   Done
                 </button>
-
               </div>
-
             )}
-
           </div>
-
         </div>
-
       )}
-
     </div>
   );
 }

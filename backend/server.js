@@ -7,12 +7,35 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import verificationRoutes from "./routes/verification.routes.js";
+import lotRoutes from "./routes/lot.routes.js";
+import buyerRoutes from "./routes/buyer.routes.js";
+import buyerDemandRoutes from "./routes/buyerDemand.routes.js";
+import adminRoutes from "./routes/admin.routes.js";
+import marketNewsRoutes from "./routes/marketNews.routes.js";
 dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const mandiCacheFile = path.join(__dirname, "data", "mandi-cache.json");
+
+const mandiHistoryFile = path.join(
+  __dirname,
+  "data",
+  "mandi-history.json"
+);
+
+let mandiHistory = {};
+
+if (fs.existsSync(mandiHistoryFile)) {
+  try {
+    mandiHistory = JSON.parse(
+      fs.readFileSync(mandiHistoryFile, "utf-8")
+    );
+  } catch {
+    mandiHistory = {};
+  }
+}
 
 const app = express();
 const PORT = 5000;
@@ -30,7 +53,11 @@ app.use(express.json());
 
 app.use("/api/auth", authRoutes);
 app.use("/api/verification", verificationRoutes);
-
+app.use("/api/buyers", buyerRoutes);
+app.use("/api/buyer-demands", buyerDemandRoutes);
+app.use("/api/admin", adminRoutes);
+app.use("/api/lots", lotRoutes);
+app.use("/api/market-news", marketNewsRoutes);
 // ========================================
 // MANDI CACHE
 // ========================================
@@ -83,6 +110,54 @@ function normalizeMandiData(data) {
   };
 }
 
+function addPriceHistory(data) {
+  const records = data.records.map((item) => {
+    const key =
+      `${item.commodity}-${item.market}`.toLowerCase();
+
+    const current = Number(item.modalPrice || 0);
+    const previous = Number(mandiHistory[key]?.modalPrice || 0);
+
+    const change =
+      previous > 0
+        ? ((current - previous) / previous) * 100
+        : null;
+
+    return {
+      ...item,
+      previousModalPrice: previous || null,
+      change,
+      type:
+        change === null
+          ? null
+          : change > 0
+          ? "up"
+          : change < 0
+          ? "down"
+          : "same",
+    };
+  });
+
+  records.forEach((item) => {
+    const key =
+      `${item.commodity}-${item.market}`.toLowerCase();
+
+    mandiHistory[key] = {
+      modalPrice: Number(item.modalPrice),
+      updatedAt: new Date().toISOString(),
+    };
+  });
+
+  fs.writeFileSync(
+    mandiHistoryFile,
+    JSON.stringify(mandiHistory, null, 2)
+  );
+
+  return {
+    ...data,
+    records,
+  };
+}
 // ========================================
 // CROP IMAGE CACHE
 // ========================================
@@ -384,7 +459,9 @@ if (
     // 6. NORMALIZE DATA
     // ========================================
 
-    const normalizedData = normalizeMandiData(data);
+    const normalizedData = addPriceHistory(
+  normalizeMandiData(data)
+);
 
     // ========================================
     // 7. SAVE RAM CACHE

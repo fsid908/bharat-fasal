@@ -50,11 +50,11 @@ function App() {
   const [isLandingPage, setIsLandingPage] = useState(location.pathname === "/");
 
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-const [userRole, setUserRole] = useState(
-  localStorage.getItem("bf_user_role") || "farmer",
-);
-const [currentUser, setCurrentUser] = useState(null);
-const [authLoading, setAuthLoading] = useState(true);
+  const [userRole, setUserRole] = useState(
+    localStorage.getItem("bf_user_role") || "farmer",
+  );
+  const [currentUser, setCurrentUser] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
 
   // =====================================================
   // LANGUAGE POPUP
@@ -73,73 +73,75 @@ const [authLoading, setAuthLoading] = useState(true);
   }, [i18n]);
 
   // =====================================================
-// JWT SESSION RESTORE
-// =====================================================
+  // JWT SESSION RESTORE
+  // =====================================================
 
-useEffect(() => {
-  const restoreSession = async () => {
-    const token = localStorage.getItem("bf_auth_token");
+  useEffect(() => {
+    const restoreSession = async () => {
+      const token = localStorage.getItem("bf_auth_token");
 
-    if (!token) {
-      setAuthLoading(false);
-      return;
-    }
-
-    try {
-      const response = await fetch("https://bharat-fasal.onrender.com/api/auth/me", {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      const data = await response.json();
-
-      if (!response.ok || !data.success) {
-        localStorage.removeItem("bf_auth_token");
-        localStorage.removeItem("bf_logged_in");
-        localStorage.removeItem("bf_user_role");
-
-        setIsLoggedIn(false);
-        setCurrentUser(null);
-        setUserRole("farmer");
-
+      if (!token) {
+        setAuthLoading(false);
         return;
       }
 
-      const backendUser = data.user;
+      try {
+        const response = await fetch(
+          "https://bharat-fasal.onrender.com/api/auth/me",
+          {
+            method: "GET",
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          },
+        );
 
-      const user = {
-        id: backendUser.id,
-        name: backendUser.name,
-        companyName: backendUser.organizationName || "",
-        email: backendUser.email || "",
-        role: backendUser.role,
-        location: backendUser.village || "",
-        phone: backendUser.mobile,
-        district: backendUser.district || "",
-        state: backendUser.state || "",
-      };
+        const data = await response.json();
 
-      setCurrentUser(user);
-      setUserRole(backendUser.role);
-      setIsLoggedIn(true);
+        if (!response.ok || !data.success) {
+          localStorage.removeItem("bf_auth_token");
+          localStorage.removeItem("bf_logged_in");
+          localStorage.removeItem("bf_user_role");
 
-      localStorage.setItem("bf_logged_in", "true");
-      localStorage.setItem("bf_user_role", backendUser.role);
+          setIsLoggedIn(false);
+          setCurrentUser(null);
+          setUserRole("farmer");
 
-    } catch (error) {
-      console.error("Session restore error:", error);
+          return;
+        }
 
-      setIsLoggedIn(false);
-      setCurrentUser(null);
-    } finally {
-      setAuthLoading(false);
-    }
-  };
+        const backendUser = data.user;
 
-  restoreSession();
-}, []);
+        const user = {
+          id: backendUser.id,
+          name: backendUser.name,
+          companyName: backendUser.organizationName || "",
+          email: backendUser.email || "",
+          role: backendUser.role,
+          location: backendUser.village || "",
+          phone: backendUser.mobile,
+          district: backendUser.district || "",
+          state: backendUser.state || "",
+        };
+
+        setCurrentUser(user);
+        setUserRole(backendUser.role);
+        setIsLoggedIn(true);
+
+        localStorage.setItem("bf_logged_in", "true");
+        localStorage.setItem("bf_user_role", backendUser.role);
+      } catch (error) {
+        console.error("Session restore error:", error);
+
+        setIsLoggedIn(false);
+        setCurrentUser(null);
+      } finally {
+        setAuthLoading(false);
+      }
+    };
+
+    restoreSession();
+  }, []);
 
   // =====================================================
   // LANGUAGE DIRECTION
@@ -196,16 +198,16 @@ useEffect(() => {
   // LOGOUT
   // =====================================================
   const handleLogout = () => {
-  localStorage.removeItem("bf_auth_token");
-  localStorage.removeItem("bf_logged_in");
-  localStorage.removeItem("bf_user_role");
+    localStorage.removeItem("bf_auth_token");
+    localStorage.removeItem("bf_logged_in");
+    localStorage.removeItem("bf_user_role");
 
-  setIsLoggedIn(false);
-  setUserRole("farmer");
-  setCurrentUser(null);
+    setIsLoggedIn(false);
+    setUserRole("farmer");
+    setCurrentUser(null);
 
-  navigate("/");
-};
+    navigate("/");
+  };
 
   // =====================================================
   // LANGUAGE POPUP COMPLETE
@@ -218,8 +220,8 @@ useEffect(() => {
   // PUBLIC LANDING PAGE + LANGUAGE POPUP
   // =====================================================
   if (authLoading) {
-  return null;
-}
+    return null;
+  }
 
   if (location.pathname === "/" && !isLoggedIn) {
     return (
@@ -240,8 +242,8 @@ useEffect(() => {
   // REGISTER
   // =====================================================
   if (location.pathname === "/register" && !isLoggedIn) {
-  return <RegisterPage onLogin={handleLogin} />;
-}
+    return <RegisterPage onLogin={handleLogin} />;
+  }
 
   // =====================================================
   // LOGIN
@@ -306,7 +308,10 @@ useEffect(() => {
         />
 
         {/* Create Lot */}
-        <Route path="/lots/create" element={<CreateLotPage />} />
+        <Route
+          path="/lots/create"
+          element={<CreateLotPage user={currentUser} />}
+        />
 
         {/* Lots */}
         <Route
