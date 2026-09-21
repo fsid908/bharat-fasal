@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Search,
   MapPin,
@@ -14,116 +14,32 @@ import {
   IndianRupee,
 } from "lucide-react";
 
-/*
-  Prototype lot data.
-
-  transportCost is the estimated transportation cost
-  for the complete lot, not per quintal.
-*/
-const availableLots = [
-  {
-    id: "LOT-101",
-    crop: "Wheat",
-    variety: "Lokwan",
-    quantity: 50,
-    grade: "Grade A",
-    price: 2500,
-    location: "Gorakhpur, Uttar Pradesh",
-    seller: "Shiv Farmers FPO",
-    sellerType: "FPO",
-    rating: 4.8,
-    availableDate: "5 Sep 2026",
-    transport: "Seller will arrange",
-    transportCost: 8500,
-    description:
-      "Clean and properly dried wheat suitable for bulk procurement.",
-  },
-  {
-    id: "LOT-102",
-    crop: "Soybean",
-    variety: "Yellow Soybean",
-    quantity: 30,
-    grade: "Grade A",
-    price: 5200,
-    location: "Indore, Madhya Pradesh",
-    seller: "Malwa Agro FPO",
-    sellerType: "FPO",
-    rating: 4.7,
-    availableDate: "8 Sep 2026",
-    transport: "Buyer will arrange",
-    transportCost: 7200,
-    description:
-      "Good quality soybean lot available for institutional procurement.",
-  },
-  {
-    id: "LOT-103",
-    crop: "Onion",
-    variety: "Red Onion",
-    quantity: 100,
-    grade: "Grade B",
-    price: 1900,
-    location: "Nashik, Maharashtra",
-    seller: "Nashik Growers Group",
-    sellerType: "Farmer Group",
-    rating: 4.6,
-    availableDate: "10 Sep 2026",
-    transport: "Seller will arrange",
-    transportCost: 12500,
-    description:
-      "Fresh red onion suitable for wholesale and food processing buyers.",
-  },
-  {
-    id: "LOT-104",
-    crop: "Cotton",
-    variety: "Long Staple",
-    quantity: 20,
-    grade: "Grade A",
-    price: 7400,
-    location: "Rajkot, Gujarat",
-    seller: "Saurashtra Cotton FPO",
-    sellerType: "FPO",
-    rating: 4.9,
-    availableDate: "12 Sep 2026",
-    transport: "Buyer will arrange",
-    transportCost: 6800,
-    description:
-      "Long staple cotton with consistent quality for textile procurement.",
-  },
-  {
-    id: "LOT-105",
-    crop: "Chickpea",
-    variety: "Desi Chickpea",
-    quantity: 40,
-    grade: "Grade A",
-    price: 6100,
-    location: "Bhopal, Madhya Pradesh",
-    seller: "Bhopal Farmer Collective",
-    sellerType: "FPO",
-    rating: 4.7,
-    availableDate: "14 Sep 2026",
-    transport: "Seller will arrange",
-    transportCost: 7900,
-    description:
-      "Well-cleaned chickpea lot available for bulk purchase.",
-  },
-];
-
 const cropOptions = [
   "All Crops",
   "Wheat",
+  "Rice",
+  "Maize",
   "Soybean",
-  "Onion",
-  "Cotton",
   "Chickpea",
+  "Onion",
+  "Tomato",
+  "Cotton",
+  "Turmeric",
 ];
 
 const gradeOptions = [
   "All Grades",
   "Grade A",
   "Grade B",
+  "Grade C",
+  "Premium",
 ];
 
+const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
+
 export default function BrowseLotsPage({ user }) {
+  const [availableLots, setAvailableLots] = useState([]);
+  const [lotsLoading, setLotsLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [crop, setCrop] = useState("All Crops");
   const [grade, setGrade] = useState("All Grades");
@@ -134,6 +50,63 @@ export default function BrowseLotsPage({ user }) {
   const [showFilters, setShowFilters] = useState(false);
   const [showRequestModal, setShowRequestModal] = useState(false);
   const [requestSent, setRequestSent] = useState(false);
+  const [requestLoading, setRequestLoading] = useState(false);
+  const [requestError, setRequestError] = useState("");
+
+  useEffect(() => {
+    const fetchLots = async () => {
+      try {
+        setLotsLoading(true);
+
+        const response = await fetch(`${API}/api/lots`);
+        const data = await response.json();
+
+        if (!response.ok || !data.success) {
+          throw new Error(data.message || "Failed to fetch lots");
+        }
+
+        const mappedLots = (data.lots || [])
+          .filter((lot) => lot.status === "listed")
+          .map((lot) => ({
+            id: lot.id,
+            crop: String(lot.commodityId || "Unknown")
+              .charAt(0)
+              .toUpperCase() +
+              String(lot.commodityId || "Unknown").slice(1),
+            variety: lot.commodityId || "—",
+            quantity: Number(lot.quantity) || 0,
+            grade: String(lot.grade || "")
+              .trim()
+              .replace(/^Grade\s+/i, "Grade ")
+              .replace(/^(A|B|C)$/i, "Grade $1"),
+            price: Number(lot.expectedPrice) || 0,
+            location: [lot.pickupLocation, lot.sellerState]
+              .filter(Boolean)
+              .join(", ") || "—",
+            seller: lot.sellerName || "Seller",
+            sellerType: lot.sellerRole === "fpo" ? "FPO" : lot.sellerRole || "Farmer",
+            rating: 0,
+            availableDate: lot.availableDate || "—",
+            transport:
+              lot.transportation === "buyer"
+                ? "Buyer will arrange"
+                : "Seller will arrange",
+            transportCost: null,
+            description: "Real marketplace lot listed by the seller.",
+            originalLot: lot,
+          }));
+
+        setAvailableLots(mappedLots);
+      } catch (error) {
+        console.error("Failed to fetch marketplace lots:", error);
+        setAvailableLots([]);
+      } finally {
+        setLotsLoading(false);
+      }
+    };
+
+    fetchLots();
+  }, []);
 
   const buyerName =
     user?.companyName ||
@@ -156,6 +129,10 @@ export default function BrowseLotsPage({ user }) {
     Landed cost = produce cost + estimated transportation
   */
   const getLandedCost = (lot) => {
+    if (lot.transportCost == null) {
+      return null;
+    }
+
     return getProduceCost(lot) + lot.transportCost;
   };
 
@@ -163,7 +140,13 @@ export default function BrowseLotsPage({ user }) {
     Landed cost per quintal
   */
   const getLandedPricePerQuintal = (lot) => {
-    return getLandedCost(lot) / lot.quantity;
+    const landedCost = getLandedCost(lot);
+
+    if (landedCost == null || !lot.quantity) {
+      return null;
+    }
+
+    return landedCost / lot.quantity;
   };
 
   const filteredLots = useMemo(() => {
@@ -201,7 +184,7 @@ export default function BrowseLotsPage({ user }) {
         matchesPrice
       );
     });
-  }, [search, crop, grade, location, maxPrice]);
+  }, [availableLots, search, crop, grade, location, maxPrice]);
 
   const clearFilters = () => {
     setSearch("");
@@ -221,21 +204,62 @@ export default function BrowseLotsPage({ user }) {
     setSelectedLot(lot);
     setShowRequestModal(true);
     setRequestSent(false);
+    setRequestError("");
   };
 
   const closeModal = () => {
     setSelectedLot(null);
     setShowRequestModal(false);
     setRequestSent(false);
+    setRequestError("");
+    setRequestLoading(false);
   };
 
-  const handleRequest = () => {
-    /*
-      Prototype behaviour.
-      In production this will create a purchase request
-      in the backend/database.
-    */
-    setRequestSent(true);
+  const handleRequest = async () => {
+    const token = localStorage.getItem("bf_auth_token");
+
+    if (!token) {
+      setRequestError("Please login before sending a purchase request.");
+      return;
+    }
+
+    if (!selectedLot?.originalLot?.id) {
+      setRequestError("Lot information is missing.");
+      return;
+    }
+
+    try {
+      setRequestLoading(true);
+      setRequestError("");
+
+      const response = await fetch(`${API}/api/purchase-requests`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          lotId: selectedLot.originalLot.id,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        setRequestError(
+          data.message || "Failed to send purchase request.",
+        );
+        return;
+      }
+
+      console.log("Purchase request created:", data.request);
+      setRequestSent(true);
+    } catch (error) {
+      console.error("Purchase request error:", error);
+      setRequestError("Unable to connect to server. Please try again.");
+    } finally {
+      setRequestLoading(false);
+    }
   };
 
   return (
@@ -486,8 +510,11 @@ export default function BrowseLotsPage({ user }) {
           LOT LIST
       ========================== */}
       <div className="space-y-4">
-
-        {filteredLots.length === 0 ? (
+        {lotsLoading ? (
+          <div className="bg-white border border-gray-200 rounded-2xl p-10 text-center text-gray-500">
+            Loading available lots...
+          </div>
+        ) : filteredLots.length === 0 ? (
           <div className="bg-white border border-gray-200 rounded-2xl p-10 text-center">
 
             <Package
@@ -650,7 +677,7 @@ export default function BrowseLotsPage({ user }) {
                     </p>
 
                     <p className="text-sm font-bold text-gray-900 mt-1">
-                      Estimated: {formatCurrency(lot.transportCost)}
+                      Estimated: Not calculated
                     </p>
                   </div>
 
@@ -662,11 +689,15 @@ export default function BrowseLotsPage({ user }) {
                     </p>
 
                     <p className="text-lg font-bold text-gray-900">
-                      {formatCurrency(landedCost)}
+                      {landedCost == null
+                        ? "Not calculated"
+                        : formatCurrency(landedCost)}
                     </p>
 
                     <p className="text-xs text-green-700 mt-1">
-                      {formatCurrency(landedPerQuintal)} / quintal
+                      {landedPerQuintal == null
+                        ? "Transportation cost pending"
+                        : `${formatCurrency(landedPerQuintal)} / quintal`}
                     </p>
                   </div>
                 </div>
@@ -880,7 +911,7 @@ export default function BrowseLotsPage({ user }) {
                   </p>
 
                   <p className="text-sm font-bold text-gray-900">
-                    {formatCurrency(selectedLot.transportCost)}
+                    {selectedLot.transportCost == null ? "Not calculated" : formatCurrency(selectedLot.transportCost)}
                   </p>
                 </div>
 
@@ -918,9 +949,9 @@ export default function BrowseLotsPage({ user }) {
                     </span>
 
                     <span className="font-medium text-gray-900">
-                      {formatCurrency(
-                        selectedLot.transportCost
-                      )}
+                      {selectedLot.transportCost == null
+                        ? "Not calculated"
+                        : formatCurrency(selectedLot.transportCost)}
                     </span>
                   </div>
 
@@ -931,17 +962,16 @@ export default function BrowseLotsPage({ user }) {
                     </span>
 
                     <span className="text-base font-bold text-green-700">
-                      {formatCurrency(
-                        getLandedCost(selectedLot)
-                      )}
+                      {getLandedCost(selectedLot) == null
+                        ? "Not calculated"
+                        : formatCurrency(getLandedCost(selectedLot))}
                     </span>
                   </div>
 
                   <div className="text-right text-xs text-gray-500">
-                    {formatCurrency(
-                      getLandedPricePerQuintal(selectedLot)
-                    )}{" "}
-                    / quintal
+                    {getLandedPricePerQuintal(selectedLot) == null
+                      ? "Transportation cost pending"
+                      : `${formatCurrency(getLandedPricePerQuintal(selectedLot))} / quintal`}
                   </div>
                 </div>
               </div>
@@ -1085,7 +1115,7 @@ export default function BrowseLotsPage({ user }) {
                     </span>
 
                     <span className="text-sm font-semibold">
-                      {formatCurrency(selectedLot.transportCost)}
+                      Not calculated
                     </span>
                   </div>
 
@@ -1096,30 +1126,28 @@ export default function BrowseLotsPage({ user }) {
                     </span>
 
                     <span className="text-sm font-bold text-green-700">
-                      {formatCurrency(
-                        getLandedCost(selectedLot)
-                      )}
+                      {getLandedCost(selectedLot) == null
+                        ? "Not calculated"
+                        : formatCurrency(getLandedCost(selectedLot))}
                     </span>
                   </div>
 
                   <p className="text-right text-xs text-gray-500 mt-1">
-                    {formatCurrency(
-                      getLandedPricePerQuintal(selectedLot)
-                    )}{" "}
-                    / quintal
+                    {getLandedPricePerQuintal(selectedLot) == null
+                      ? "Transportation cost pending"
+                      : `${formatCurrency(getLandedPricePerQuintal(selectedLot))} / quintal`}
                   </p>
                 </div>
 
                 {/* QUANTITY */}
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Quantity you want to purchase
+                  Quantity in this purchase request
                 </label>
 
                 <input
                   type="number"
-                  defaultValue={selectedLot.quantity}
-                  min="1"
-                  max={selectedLot.quantity}
+                  value={selectedLot.quantity}
+                  readOnly
                   className="
                     w-full
                     h-11
@@ -1135,7 +1163,7 @@ export default function BrowseLotsPage({ user }) {
                 />
 
                 <p className="text-xs text-gray-500 mt-1">
-                  Maximum available: {selectedLot.quantity} Quintals
+                  This request is for the full listed lot: {selectedLot.quantity} Quintals
                 </p>
 
                 {/* PAYMENT */}
@@ -1161,22 +1189,34 @@ export default function BrowseLotsPage({ user }) {
                   </div>
                 </div>
 
+                {requestError && (
+                  <div className="mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                    {requestError}
+                  </div>
+                )}
+
                 {/* SUBMIT */}
                 <button
                   type="button"
                   onClick={handleRequest}
-                  className="
+                  disabled={requestLoading}
+                  className={`
                     w-full
                     h-11
                     mt-5
                     rounded-xl
-                    bg-green-600
                     text-white
                     font-semibold
-                    hover:bg-green-700
-                  "
+                    ${
+                      requestLoading
+                        ? "bg-gray-400 cursor-not-allowed"
+                        : "bg-green-600 hover:bg-green-700"
+                    }
+                  `}
                 >
-                  Send Purchase Request
+                  {requestLoading
+                    ? "Sending Request..."
+                    : "Send Purchase Request"}
                 </button>
 
               </div>
@@ -1230,9 +1270,9 @@ export default function BrowseLotsPage({ user }) {
                     </span>
 
                     <span className="font-semibold text-green-700">
-                      {formatCurrency(
-                        getLandedCost(selectedLot)
-                      )}
+                      {getLandedCost(selectedLot) == null
+                        ? "Not calculated"
+                        : formatCurrency(getLandedCost(selectedLot))}
                     </span>
                   </div>
 

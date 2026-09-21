@@ -30,6 +30,8 @@ export default function DashboardPage({ user }) {
   const currentUser = user;
   const greeting = getGreeting();
   const [activeLots, setActiveLots] = useState([]);
+  const [purchaseRequests, setPurchaseRequests] = useState([]);
+  const [purchaseRequestsLoading, setPurchaseRequestsLoading] = useState(true);
   const [marketNews, setMarketNews] = useState([]);
 
   useEffect(() => {
@@ -87,6 +89,61 @@ export default function DashboardPage({ user }) {
     };
 
     fetchActiveLots();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [currentUser?.id, currentUser?._id, currentUser?.userId]);
+
+  useEffect(() => {
+    const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
+    let cancelled = false;
+
+    const fetchPurchaseRequests = async () => {
+      const token = localStorage.getItem("bf_auth_token");
+
+      if (!token) {
+        if (!cancelled) {
+          setPurchaseRequests([]);
+          setPurchaseRequestsLoading(false);
+        }
+        return;
+      }
+
+      try {
+        setPurchaseRequestsLoading(true);
+
+        const response = await fetch(`${API}/api/purchase-requests/my`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        if (!response.ok) {
+          throw new Error(`Purchase requests API error: ${response.status}`);
+        }
+
+        const data = await response.json();
+
+        if (!cancelled && data.success && Array.isArray(data.requests)) {
+          setPurchaseRequests(data.requests);
+        } else if (!cancelled) {
+          setPurchaseRequests([]);
+        }
+      } catch (error) {
+        console.error("Purchase requests fetch error:", error);
+
+        if (!cancelled) {
+          setPurchaseRequests([]);
+        }
+      } finally {
+        if (!cancelled) {
+          setPurchaseRequestsLoading(false);
+        }
+      }
+    };
+
+    fetchPurchaseRequests();
 
     return () => {
       cancelled = true;
@@ -724,6 +781,124 @@ export default function DashboardPage({ user }) {
               </div>
             )}
           </div>
+        </section>
+
+        <section>
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <h3 className="text-lg font-bold text-gray-900">
+                Purchase Requests
+              </h3>
+              <p className="text-sm text-gray-500 mt-0.5">
+                Buyers who have requested to purchase your listed crops
+              </p>
+            </div>
+
+            {purchaseRequests.length > 0 && (
+              <span className="px-2.5 py-1 rounded-full bg-primary-50 text-primary-700 text-xs font-semibold">
+                {purchaseRequests.length} request{purchaseRequests.length === 1 ? "" : "s"}
+              </span>
+            )}
+          </div>
+
+          {purchaseRequestsLoading ? (
+            <div className="bg-white border border-gray-200 rounded-2xl p-6 text-center text-sm text-gray-500">
+              Loading purchase requests...
+            </div>
+          ) : purchaseRequests.length ? (
+            <div className="space-y-3">
+              {purchaseRequests.map((request) => (
+                <div
+                  key={request.requestId || request._id}
+                  className="bg-white border border-gray-200 rounded-2xl shadow-sm p-4 hover:shadow-md transition-shadow"
+                >
+                  <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
+                    <div className="flex items-start gap-3 min-w-0">
+                      <div className="w-11 h-11 rounded-xl bg-primary-50 border border-primary-100 flex items-center justify-center flex-shrink-0">
+                        <Package size={21} className="text-primary-600" />
+                      </div>
+
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h4 className="font-bold text-gray-900 capitalize">
+                            {String(request.commodityId || "Crop").replace(/[-_]/g, " ")}
+                          </h4>
+
+                          <span
+                            className={`px-2 py-1 rounded-md text-[11px] font-semibold ${
+                              request.status === "pending"
+                                ? "bg-yellow-50 text-yellow-700"
+                                : request.status === "accepted"
+                                  ? "bg-green-50 text-green-700"
+                                  : "bg-red-50 text-red-700"
+                            }`}
+                          >
+                            {request.status}
+                          </span>
+                        </div>
+
+                        <p className="text-xs text-gray-500 mt-1">
+                          Request ID: {request.requestId}
+                        </p>
+
+                        <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-sm">
+                          <div>
+                            <p className="text-xs text-gray-400">Buyer</p>
+                            <p className="mt-1 font-semibold text-gray-900">
+                              {request.buyerName || "Buyer"}
+                            </p>
+                          </div>
+
+                          <div>
+                            <p className="text-xs text-gray-400">Quantity</p>
+                            <p className="mt-1 font-semibold text-gray-900">
+                              {request.quantity} Quintals
+                            </p>
+                          </div>
+
+                          <div>
+                            <p className="text-xs text-gray-400">Offered Price</p>
+                            <p className="mt-1 font-semibold text-gray-900">
+                              ₹{Number(request.offeredPrice || 0).toLocaleString("en-IN")}/q
+                            </p>
+                          </div>
+
+                          <div>
+                            <p className="text-xs text-gray-400">Total Amount</p>
+                            <p className="mt-1 font-bold text-primary-700">
+                              ₹{Number(request.totalAmount || 0).toLocaleString("en-IN")}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row lg:flex-col gap-2 lg:min-w-[130px]">
+                      <button
+                        type="button"
+                        disabled={request.status !== "pending"}
+                        className="inline-flex items-center justify-center px-4 py-2.5 rounded-xl bg-green-600 text-white text-sm font-semibold hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        Accept
+                      </button>
+
+                      <button
+                        type="button"
+                        disabled={request.status !== "pending"}
+                        className="inline-flex items-center justify-center px-4 py-2.5 rounded-xl border border-gray-200 bg-white text-gray-700 text-sm font-semibold hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        Reject
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="bg-white border border-gray-200 rounded-2xl p-6 text-center text-sm text-gray-500">
+              No purchase requests yet. New buyer requests will appear here.
+            </div>
+          )}
         </section>
 
         <section>

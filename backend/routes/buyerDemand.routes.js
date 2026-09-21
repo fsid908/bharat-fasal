@@ -1,6 +1,7 @@
 import express from "express";
 import BuyerDemand from "../models/buyerDemand.model.js";
 import Buyer from "../models/buyer.model.js";
+import Lot from "../models/lot.model.js";
 import protect from "../middleware/auth.middleware.js";
 
 const router = express.Router();
@@ -98,4 +99,60 @@ router.post("/", protect, async (req, res) => {
   }
 });
 
+// GET matching lots for a buyer demand
+router.get("/:id/matches", protect, async (req, res) => {
+  try {
+    const demand = await BuyerDemand.findById(req.params.id);
+
+    if (!demand) {
+      return res.status(404).json({
+        success: false,
+        message: "Buyer demand not found",
+      });
+    }
+
+    const normalizedDemandGrade = demand.grade
+  .replace(/^Grade\s+/i, "")
+  .trim();
+
+const lots = await Lot.find({
+  status: "listed",
+  commodityId: demand.commodityId,
+}).sort({ createdAt: -1 });
+
+const gradeMatchingLots = lots.filter((lot) => {
+  const normalizedLotGrade = String(lot.grade)
+    .replace(/^Grade\s+/i, "")
+    .trim();
+
+  return normalizedLotGrade.toLowerCase() === normalizedDemandGrade.toLowerCase();
+});
+
+   const matchingLots = gradeMatchingLots.filter((lot) => {
+      const lotQuantity = Number(lot.quantity);
+      const demandQuantity = Number(demand.quantity);
+      const lotPrice = Number(lot.expectedPrice);
+      const demandPrice = Number(demand.priceOffered);
+
+      return (
+        lotQuantity >= demandQuantity &&
+        lotPrice <= demandPrice
+      );
+    });
+
+    return res.json({
+      success: true,
+      demand,
+      count: matchingLots.length,
+      lots: matchingLots,
+    });
+  } catch (error) {
+    console.error("Match buyer demand error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to find matching lots",
+    });
+  }
+});
 export default router;

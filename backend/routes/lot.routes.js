@@ -42,4 +42,28 @@ router.get("/", async (req, res) => {
   }
 });
 
+router.get("/:id", async (req, res) => {
+  try {
+    const lot = await Lot.findOne({ id: req.params.id });
+
+    if (!lot) {
+      return res.status(404).json({
+        success: false,
+        message: "Lot not found",
+      });
+    }
+
+    res.json({
+      success: true,
+      lot,
+    });
+  } catch (error) {
+    console.error("Get lot details error:", error);
+
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch lot details",
+    });
+  }
+});
 export default router;

@@ -41,6 +41,7 @@ import LogisticsPage from "./pages/LogisticsPage";
 import PaymentsPage from "./pages/PaymentsPage";
 import DisputePage from "./pages/DisputePage";
 import SettingsPage from "./pages/SettingsPage";
+import LotDetailsPage from "./pages/LotDetailsPage";
 
 function App() {
   const { i18n } = useTranslation();
@@ -302,10 +303,13 @@ function App() {
         <Route path="/prices/:commodityId" element={<PriceDetailPage />} />
 
         {/* Buyers */}
+        {/* Buyers */}
         <Route
           path="/buyers"
           element={<BuyerMarketPage user={currentUser} />}
         />
+
+        <Route path="/buyers/lot/:lotId" element={<LotDetailsPage />} />
 
         {/* Create Lot */}
         <Route

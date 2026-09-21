@@ -108,6 +108,8 @@ export default function BuyerMarketPage({ user }) {
     transportation: "",
   });
   const [submitted, setSubmitted] = useState(false);
+  const [matchingLots, setMatchingLots] = useState({});
+  const [loadingMatches, setLoadingMatches] = useState({});
   const [lotSearch, setLotSearch] = useState("");
   const [lotGrade, setLotGrade] = useState("all");
   const changeTab = (newTab) => {
@@ -180,6 +182,32 @@ export default function BuyerMarketPage({ user }) {
     } catch (error) {
       console.error("Create buyer demand error:", error);
       alert("Unable to connect to server. Please try again.");
+    }
+  };
+  const handleFindMatches = async (demandId) => {
+    setLoadingMatches((p) => ({ ...p, [demandId]: true }));
+    try {
+      const response = await fetch(
+        `${API}/api/buyer-demands/${demandId}/matches`,
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("bf_auth_token")}`,
+          },
+        },
+      );
+      const data = await response.json();
+      console.log("🔎 MATCHING RESPONSE:", data);
+      if (!response.ok || !data.success) {
+        alert(data.message || "Failed to find matching lots");
+        return;
+      }
+      console.log("✅ Matching Lots:", data.lots);
+      setMatchingLots((p) => ({ ...p, [demandId]: data.lots || [] }));
+    } catch (error) {
+      console.error("Find matching lots error:", error);
+      alert("Unable to connect to server.");
+    } finally {
+      setLoadingMatches((p) => ({ ...p, [demandId]: false }));
     }
   };
   const resetForm = () => {
@@ -413,14 +441,128 @@ export default function BuyerMarketPage({ user }) {
                           </div>
                           <button
                             type="button"
-                            onClick={() => navigate("/lots")}
-                            className="inline-flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white rounded-lg px-4 py-2 text-sm font-semibold transition-colors"
+                            onClick={() => handleFindMatches(demand._id)}
+                            disabled={loadingMatches[demand._id]}
+                            className="inline-flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-lg px-4 py-2 text-sm font-semibold transition-colors"
                           >
                             <Package size={15} />
-                            Submit Lot
+                            {loadingMatches[demand._id]
+                              ? "Finding..."
+                              : "Find Matching Lots"}
                           </button>
                         </div>
                       </div>
+                      {matchingLots[demand._id] && (
+                        <div className="mt-5 pt-5 border-t border-gray-100">
+                          <div className="flex items-center justify-between mb-3">
+                            <div>
+                              <h4 className="text-sm font-bold text-gray-900">
+                                Matching Lots
+                              </h4>
+                              <p className="text-xs text-gray-500 mt-1">
+                                Lots matching quantity, grade and price.
+                              </p>
+                            </div>
+                            <span className="text-xs font-semibold text-green-700">
+                              {matchingLots[demand._id].length} match
+                              {matchingLots[demand._id].length !== 1
+                                ? "es"
+                                : ""}
+                            </span>
+                          </div>
+                          {matchingLots[demand._id].length ? (
+                            <div className="space-y-3">
+                              {matchingLots[demand._id].map((lot) => (
+                                <div
+                                  key={lot._id || lot.id}
+                                  className="border border-green-200 bg-green-50/40 rounded-xl p-4"
+                                >
+                                  <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
+                                    <div>
+                                      <div className="flex items-center gap-2">
+                                        <Package
+                                          size={16}
+                                          className="text-green-600"
+                                        />
+                                        <h5 className="font-bold text-gray-900">
+                                          {getCommodityName(lot.commodityId, t)}
+                                        </h5>
+                                      </div>
+                                      <p className="text-xs text-gray-400 mt-1">
+                                        Lot ID: {lot.id}
+                                      </p>
+                                    </div>
+                                    <div className="text-left lg:text-right">
+                                      <p className="text-lg font-bold text-green-700">
+                                        {formatCurrency(lot.expectedPrice)}
+                                      </p>
+                                      <p className="text-xs text-gray-500">
+                                        per quintal
+                                      </p>
+                                    </div>
+                                  </div>
+                                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
+                                    <div>
+                                      <p className="text-xs text-gray-400">
+                                        Quantity
+                                      </p>
+                                      <p className="mt-1 text-sm font-semibold text-gray-900">
+                                        {lot.quantity} Quintals
+                                      </p>
+                                    </div>
+                                    <div>
+                                      <p className="text-xs text-gray-400">
+                                        Grade
+                                      </p>
+                                      <p className="mt-1 text-sm font-semibold text-gray-900">
+                                        {lot.grade}
+                                      </p>
+                                    </div>
+                                    <div>
+                                      <p className="text-xs text-gray-400">
+                                        Pickup Location
+                                      </p>
+                                      <p className="mt-1 text-sm font-semibold text-gray-900">
+                                        {lot.pickupLocation || "—"}
+                                      </p>
+                                    </div>
+                                    <div>
+                                      <p className="text-xs text-gray-400">
+                                        Available From
+                                      </p>
+                                      <p className="mt-1 text-sm font-semibold text-gray-900">
+                                        {formatDate(lot.availableDate)}
+                                      </p>
+                                    </div>
+                                  </div>
+                                  <div className="flex justify-end mt-4">
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        navigate(`/buyers/lot/${lot.id}`)
+                                      }
+                                      className="inline-flex items-center gap-2 rounded-lg bg-green-600 hover:bg-green-700 text-white px-4 py-2 text-xs font-semibold"
+                                    >
+                                      <Eye size={14} />
+                                      View Lot
+                                    </button>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 text-center">
+                              <p className="text-sm font-semibold text-gray-700">
+                                No matching lots found
+                              </p>
+                              <p className="text-xs text-gray-500 mt-1">
+                                No single lot currently meets the required
+                                quantity, grade and price.
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   );
                 })
