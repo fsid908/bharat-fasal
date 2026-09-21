@@ -241,5 +241,65 @@ router.get("/:requestId", protect, async (req, res) => {
     });
   }
 });
+router.patch("/:requestId/status", protect, async (req, res) => {
+  try {
+    const { status } = req.body;
 
+    if (req.user.role !== "farmer" && req.user.role !== "fpo") {
+      return res.status(403).json({
+        success: false,
+        message: "Only sellers can update purchase requests",
+      });
+    }
+
+    if (!["accepted", "rejected"].includes(status)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid request status",
+      });
+    }
+
+    const request = await PurchaseRequest.findOne({
+      requestId: req.params.requestId,
+    });
+
+    if (!request) {
+      return res.status(404).json({
+        success: false,
+        message: "Purchase request not found",
+      });
+    }
+
+    if (String(request.sellerId) !== String(req.user.userId)) {
+      return res.status(403).json({
+        success: false,
+        message: "You are not authorized to update this request",
+      });
+    }
+
+    if (request.status !== "pending") {
+      return res.status(400).json({
+        success: false,
+        message: "Only pending requests can be updated",
+      });
+    }
+
+    request.status = status;
+
+    await request.save();
+
+    return res.json({
+      success: true,
+      message: `Purchase request ${status} successfully`,
+      request,
+    });
+  } catch (error) {
+    console.error("Update purchase request status error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to update purchase request status",
+    });
+  }
+});
 export default router;

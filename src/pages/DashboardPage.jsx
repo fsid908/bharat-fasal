@@ -32,6 +32,7 @@ export default function DashboardPage({ user }) {
   const [activeLots, setActiveLots] = useState([]);
   const [purchaseRequests, setPurchaseRequests] = useState([]);
   const [purchaseRequestsLoading, setPurchaseRequestsLoading] = useState(true);
+  const [requestActionLoading, setRequestActionLoading] = useState(null);
   const [marketNews, setMarketNews] = useState([]);
 
   useEffect(() => {
@@ -300,6 +301,52 @@ export default function DashboardPage({ user }) {
       clearInterval(interval);
     };
   }, []);
+
+  const handlePurchaseRequestStatus = async (requestId, status) => {
+    const token = localStorage.getItem("bf_auth_token");
+
+    if (!token) {
+      alert("Please login again.");
+      return;
+    }
+
+    try {
+      setRequestActionLoading(requestId);
+
+      const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
+
+      const response = await fetch(
+        `${API}/api/purchase-requests/${requestId}/status`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ status }),
+        },
+      );
+
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.message || "Failed to update purchase request");
+      }
+
+      setPurchaseRequests((prev) =>
+        prev.map((request) =>
+          request.requestId === requestId
+            ? { ...request, status: data.request.status }
+            : request,
+        ),
+      );
+    } catch (error) {
+      console.error("Purchase request status error:", error);
+      alert(error.message || "Something went wrong.");
+    } finally {
+      setRequestActionLoading(null);
+    }
+  };
 
   const quickActions = [
     {
@@ -796,7 +843,8 @@ export default function DashboardPage({ user }) {
 
             {purchaseRequests.length > 0 && (
               <span className="px-2.5 py-1 rounded-full bg-primary-50 text-primary-700 text-xs font-semibold">
-                {purchaseRequests.length} request{purchaseRequests.length === 1 ? "" : "s"}
+                {purchaseRequests.length} request
+                {purchaseRequests.length === 1 ? "" : "s"}
               </span>
             )}
           </div>
@@ -821,7 +869,10 @@ export default function DashboardPage({ user }) {
                       <div className="min-w-0">
                         <div className="flex flex-wrap items-center gap-2">
                           <h4 className="font-bold text-gray-900 capitalize">
-                            {String(request.commodityId || "Crop").replace(/[-_]/g, " ")}
+                            {String(request.commodityId || "Crop").replace(
+                              /[-_]/g,
+                              " ",
+                            )}
                           </h4>
 
                           <span
@@ -857,16 +908,27 @@ export default function DashboardPage({ user }) {
                           </div>
 
                           <div>
-                            <p className="text-xs text-gray-400">Offered Price</p>
+                            <p className="text-xs text-gray-400">
+                              Offered Price
+                            </p>
                             <p className="mt-1 font-semibold text-gray-900">
-                              ₹{Number(request.offeredPrice || 0).toLocaleString("en-IN")}/q
+                              ₹
+                              {Number(request.offeredPrice || 0).toLocaleString(
+                                "en-IN",
+                              )}
+                              /q
                             </p>
                           </div>
 
                           <div>
-                            <p className="text-xs text-gray-400">Total Amount</p>
+                            <p className="text-xs text-gray-400">
+                              Total Amount
+                            </p>
                             <p className="mt-1 font-bold text-primary-700">
-                              ₹{Number(request.totalAmount || 0).toLocaleString("en-IN")}
+                              ₹
+                              {Number(request.totalAmount || 0).toLocaleString(
+                                "en-IN",
+                              )}
                             </p>
                           </div>
                         </div>
@@ -874,21 +936,43 @@ export default function DashboardPage({ user }) {
                     </div>
 
                     <div className="flex flex-col sm:flex-row lg:flex-col gap-2 lg:min-w-[130px]">
-                      <button
-                        type="button"
-                        disabled={request.status !== "pending"}
-                        className="inline-flex items-center justify-center px-4 py-2.5 rounded-xl bg-green-600 text-white text-sm font-semibold hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        Accept
-                      </button>
+                      {request.status === "pending" && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              handlePurchaseRequestStatus(
+                                request.requestId,
+                                "accepted",
+                              )
+                            }
+                            disabled={
+                              requestActionLoading === request.requestId
+                            }
+                            className="inline-flex items-center justify-center px-4 py-2.5 rounded-xl bg-green-600 text-white text-sm font-semibold hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            {requestActionLoading === request.requestId
+                              ? "Updating..."
+                              : "Accept"}
+                          </button>
 
-                      <button
-                        type="button"
-                        disabled={request.status !== "pending"}
-                        className="inline-flex items-center justify-center px-4 py-2.5 rounded-xl border border-gray-200 bg-white text-gray-700 text-sm font-semibold hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        Reject
-                      </button>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              handlePurchaseRequestStatus(
+                                request.requestId,
+                                "rejected",
+                              )
+                            }
+                            disabled={
+                              requestActionLoading === request.requestId
+                            }
+                            className="inline-flex items-center justify-center px-4 py-2.5 rounded-xl border border-gray-200 bg-white text-gray-700 text-sm font-semibold hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            Reject
+                          </button>
+                        </>
+                      )}
                     </div>
                   </div>
                 </div>
