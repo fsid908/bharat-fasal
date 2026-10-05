@@ -13,8 +13,9 @@ import buyerDemandRoutes from "./routes/buyerDemand.routes.js";
 import adminRoutes from "./routes/admin.routes.js";
 import marketNewsRoutes from "./routes/marketNews.routes.js";
 import purchaseRequestRoutes from "./routes/purchaseRequest.routes.js";
+import offerRoutes from "./routes/offer.routes.js";
 dotenv.config();
-
+import orderRoutes from "./routes/order.routes.js";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -60,6 +61,8 @@ app.use("/api/admin", adminRoutes);
 app.use("/api/lots", lotRoutes);
 app.use("/api/market-news", marketNewsRoutes);
 app.use("/api/purchase-requests", purchaseRequestRoutes);
+app.use("/api/offers", offerRoutes);
+app.use("/api/orders", orderRoutes);
 // ========================================
 // MANDI CACHE
 // ========================================
