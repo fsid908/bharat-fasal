@@ -87,58 +87,66 @@ function App() {
       }
 
       try {
-        const response = await fetch(
-          "https://bharat-fasal.onrender.com/api/auth/me",
-          {
-            method: "GET",
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          },
-        );
+  const response = await fetch(
+    "https://bharat-fasal.onrender.com/api/auth/me",
+    {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    },
+  );
 
-        const data = await response.json();
+  let data;
 
-        if (!response.ok || !data.success) {
-          localStorage.removeItem("bf_auth_token");
-          localStorage.removeItem("bf_logged_in");
-          localStorage.removeItem("bf_user_role");
+  try {
+    data = await response.json();
+  } catch {
+    throw new Error(
+      `Session API returned an invalid response (HTTP ${response.status})`,
+    );
+  }
 
-          setIsLoggedIn(false);
-          setCurrentUser(null);
-          setUserRole("farmer");
+  if (!response.ok || !data.success) {
+    localStorage.removeItem("bf_auth_token");
+    localStorage.removeItem("bf_logged_in");
+    localStorage.removeItem("bf_user_role");
 
-          return;
-        }
+    setIsLoggedIn(false);
+    setCurrentUser(null);
+    setUserRole("farmer");
 
-        const backendUser = data.user;
+    return;
+  }
 
-        const user = {
-          id: backendUser.id,
-          name: backendUser.name,
-          companyName: backendUser.organizationName || "",
-          email: backendUser.email || "",
-          role: backendUser.role,
-          location: backendUser.village || "",
-          phone: backendUser.mobile,
-          district: backendUser.district || "",
-          state: backendUser.state || "",
-        };
+  const backendUser = data.user;
 
-        setCurrentUser(user);
-        setUserRole(backendUser.role);
-        setIsLoggedIn(true);
+  const user = {
+    id: backendUser.id,
+    name: backendUser.name,
+    companyName: backendUser.organizationName || "",
+    email: backendUser.email || "",
+    role: backendUser.role,
+    location: backendUser.village || "",
+    phone: backendUser.mobile,
+    district: backendUser.district || "",
+    state: backendUser.state || "",
+  };
 
-        localStorage.setItem("bf_logged_in", "true");
-        localStorage.setItem("bf_user_role", backendUser.role);
-      } catch (error) {
-        console.error("Session restore error:", error);
+  setCurrentUser(user);
+  setUserRole(backendUser.role);
+  setIsLoggedIn(true);
 
-        setIsLoggedIn(false);
-        setCurrentUser(null);
-      } finally {
-        setAuthLoading(false);
-      }
+  localStorage.setItem("bf_logged_in", "true");
+  localStorage.setItem("bf_user_role", backendUser.role);
+} catch (error) {
+  console.error("Session restore error:", error);
+
+  setIsLoggedIn(false);
+  setCurrentUser(null);
+} finally {
+  setAuthLoading(false);
+}
     };
 
     restoreSession();

@@ -302,7 +302,7 @@ export default function DashboardPage({ user }) {
     };
   }, []);
 
-  const handlePurchaseRequestStatus = async (requestId, status) => {
+  const handlePurchaseRequestAction = async (requestId, status) => {
     const token = localStorage.getItem("bf_auth_token");
 
     if (!token) {
@@ -313,10 +313,8 @@ export default function DashboardPage({ user }) {
     try {
       setRequestActionLoading(requestId);
 
-      const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
-
       const response = await fetch(
-        `${API}/api/purchase-requests/${requestId}/status`,
+        `${import.meta.env.VITE_API_URL || "http://localhost:5000"}/api/purchase-requests/${requestId}/status`,
         {
           method: "PATCH",
           headers: {
@@ -330,19 +328,21 @@ export default function DashboardPage({ user }) {
       const data = await response.json();
 
       if (!response.ok || !data.success) {
-        throw new Error(data.message || "Failed to update purchase request");
+        throw new Error(
+          data.message || `Failed to ${status} purchase request.`,
+        );
       }
 
       setPurchaseRequests((prev) =>
         prev.map((request) =>
           request.requestId === requestId
-            ? { ...request, status: data.request.status }
+            ? { ...request, status: data.request?.status || status }
             : request,
         ),
       );
     } catch (error) {
-      console.error("Purchase request status error:", error);
-      alert(error.message || "Something went wrong.");
+      console.error("Purchase request action error:", error);
+      alert(error.message || "Unable to update purchase request.");
     } finally {
       setRequestActionLoading(null);
     }
@@ -936,43 +936,43 @@ export default function DashboardPage({ user }) {
                     </div>
 
                     <div className="flex flex-col sm:flex-row lg:flex-col gap-2 lg:min-w-[130px]">
-                      {request.status === "pending" && (
-                        <>
-                          <button
-                            type="button"
-                            onClick={() =>
-                              handlePurchaseRequestStatus(
-                                request.requestId,
-                                "accepted",
-                              )
-                            }
-                            disabled={
-                              requestActionLoading === request.requestId
-                            }
-                            className="inline-flex items-center justify-center px-4 py-2.5 rounded-xl bg-green-600 text-white text-sm font-semibold hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                          >
-                            {requestActionLoading === request.requestId
-                              ? "Updating..."
-                              : "Accept"}
-                          </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          handlePurchaseRequestAction(
+                            request.requestId,
+                            "accepted",
+                          )
+                        }
+                        disabled={
+                          request.status !== "pending" ||
+                          requestActionLoading === request.requestId
+                        }
+                        className="inline-flex items-center justify-center px-4 py-2.5 rounded-xl bg-green-600 text-white text-sm font-semibold hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {requestActionLoading === request.requestId
+                          ? "Updating..."
+                          : "Accept"}
+                      </button>
 
-                          <button
-                            type="button"
-                            onClick={() =>
-                              handlePurchaseRequestStatus(
-                                request.requestId,
-                                "rejected",
-                              )
-                            }
-                            disabled={
-                              requestActionLoading === request.requestId
-                            }
-                            className="inline-flex items-center justify-center px-4 py-2.5 rounded-xl border border-gray-200 bg-white text-gray-700 text-sm font-semibold hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                          >
-                            Reject
-                          </button>
-                        </>
-                      )}
+                      <button
+                        type="button"
+                        onClick={() =>
+                          handlePurchaseRequestAction(
+                            request.requestId,
+                            "rejected",
+                          )
+                        }
+                        disabled={
+                          request.status !== "pending" ||
+                          requestActionLoading === request.requestId
+                        }
+                        className="inline-flex items-center justify-center px-4 py-2.5 rounded-xl border border-gray-200 bg-white text-gray-700 text-sm font-semibold hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {requestActionLoading === request.requestId
+                          ? "Updating..."
+                          : "Reject"}
+                      </button>
                     </div>
                   </div>
                 </div>

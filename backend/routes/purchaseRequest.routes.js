@@ -8,17 +8,9 @@ const router = express.Router();
 
 console.log("🔥 PURCHASE REQUEST ROUTES LOADED");
 
-// =====================================================
-// CREATE PURCHASE REQUEST
-// =====================================================
-
 router.post("/", protect, async (req, res) => {
   try {
     const { lotId } = req.body;
-
-    // -----------------------------------------------
-    // Validate lot ID
-    // -----------------------------------------------
 
     if (!lotId) {
       return res.status(400).json({
@@ -27,20 +19,12 @@ router.post("/", protect, async (req, res) => {
       });
     }
 
-    // -----------------------------------------------
-    // Only buyer can create purchase request
-    // -----------------------------------------------
-
     if (req.user.role !== "buyer") {
       return res.status(403).json({
         success: false,
         message: "Only buyers can send purchase requests",
       });
     }
-
-    // -----------------------------------------------
-    // Find buyer from authenticated user
-    // -----------------------------------------------
 
     const buyer = await Buyer.findOne({
       userId: req.user.userId,
@@ -53,10 +37,6 @@ router.post("/", protect, async (req, res) => {
       });
     }
 
-    // -----------------------------------------------
-    // Find lot
-    // -----------------------------------------------
-
     const lot = await Lot.findOne({
       id: lotId,
     });
@@ -68,20 +48,12 @@ router.post("/", protect, async (req, res) => {
       });
     }
 
-    // -----------------------------------------------
-    // Check lot availability
-    // -----------------------------------------------
-
     if (lot.status !== "listed") {
       return res.status(400).json({
         success: false,
         message: "This lot is no longer available",
       });
     }
-
-    // -----------------------------------------------
-    // Prevent duplicate pending request
-    // -----------------------------------------------
 
     const existingRequest = await PurchaseRequest.findOne({
       lotId: lot.id,
@@ -97,45 +69,24 @@ router.post("/", protect, async (req, res) => {
       });
     }
 
-    // -----------------------------------------------
-    // Calculate amount
-    // -----------------------------------------------
-
     const quantity = Number(lot.quantity);
     const offeredPrice = Number(lot.expectedPrice);
     const totalAmount = quantity * offeredPrice;
 
-    // -----------------------------------------------
-    // Generate request ID
-    // -----------------------------------------------
-
     const requestId = `BF-REQ-${Date.now()}`;
-
-    // -----------------------------------------------
-    // Save purchase request
-    // -----------------------------------------------
 
     const purchaseRequest = await PurchaseRequest.create({
       requestId,
-
       lotId: lot.id,
-
       buyerId: String(buyer.id),
       buyerName: buyer.name,
-
       sellerId: String(lot.sellerId),
       sellerName: lot.sellerName || "Seller",
-
       commodityId: lot.commodityId,
-
       quantity,
-
       grade: lot.grade,
-
       offeredPrice,
-
       totalAmount,
-
       status: "pending",
     });
 
@@ -155,14 +106,9 @@ router.post("/", protect, async (req, res) => {
   }
 });
 
-// =====================================================
-// GET ALL PURCHASE REQUESTS
-// =====================================================
-
 router.get("/", protect, async (req, res) => {
   try {
-    const requests = await PurchaseRequest.find()
-      .sort({ createdAt: -1 });
+    const requests = await PurchaseRequest.find().sort({ createdAt: -1 });
 
     return res.json({
       success: true,
@@ -179,41 +125,56 @@ router.get("/", protect, async (req, res) => {
   }
 });
 
-// =====================================================
-// GET PURCHASE REQUESTS FOR CURRENT SELLER
-// =====================================================
-
 router.get("/my", protect, async (req, res) => {
   try {
-    // Only farmers/FPO sellers can view seller requests
-    if (req.user.role !== "farmer" && req.user.role !== "fpo") {
-      return res.status(403).json({
-        success: false,
-        message: "Only sellers can view purchase requests",
+    if (req.user.role === "farmer" || req.user.role === "fpo") {
+      const requests = await PurchaseRequest.find({
+        sellerId: String(req.user.userId),
+      }).sort({ createdAt: -1 });
+
+      return res.json({
+        success: true,
+        count: requests.length,
+        requests,
       });
     }
 
-    const requests = await PurchaseRequest.find({
-      sellerId: String(req.user.userId),
-    }).sort({ createdAt: -1 });
+    if (req.user.role === "buyer") {
+      const buyer = await Buyer.findOne({
+        userId: req.user.userId,
+      });
 
-    return res.json({
-      success: true,
-      count: requests.length,
-      requests,
+      if (!buyer) {
+        return res.status(404).json({
+          success: false,
+          message: "Buyer profile not found",
+        });
+      }
+
+      const requests = await PurchaseRequest.find({
+        buyerId: String(buyer.id),
+      }).sort({ createdAt: -1 });
+
+      return res.json({
+        success: true,
+        count: requests.length,
+        requests,
+      });
+    }
+
+    return res.status(403).json({
+      success: false,
+      message: "You are not authorized to view purchase requests",
     });
   } catch (error) {
-    console.error("Get seller purchase requests error:", error);
+    console.error("Get my purchase requests error:", error);
 
     return res.status(500).json({
       success: false,
-      message: "Failed to fetch purchase requests",
+      message: "Failed to fetch your purchase requests",
     });
   }
 });
-// =====================================================
-// GET SINGLE PURCHASE REQUEST
-// =====================================================
 
 router.get("/:requestId", protect, async (req, res) => {
   try {
@@ -241,6 +202,7 @@ router.get("/:requestId", protect, async (req, res) => {
     });
   }
 });
+
 router.patch("/:requestId/status", protect, async (req, res) => {
   try {
     const { status } = req.body;
@@ -302,4 +264,5 @@ router.patch("/:requestId/status", protect, async (req, res) => {
     });
   }
 });
+
 export default router;

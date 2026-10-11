@@ -69,71 +69,247 @@ export default function BuyerDashboardPage({ user }) {
   // REAL DATA
   // =====================================================
 
+  const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
+
   const [activeDemands, setActiveDemands] = useState([]);
   const [availableLots, setAvailableLots] = useState([]);
   const [marketWatch, setMarketWatch] = useState([]);
+  const [purchaseRequests, setPurchaseRequests] = useState([]);
   const [recentProcurement, setRecentProcurement] = useState([]);
+  const [myOrders, setMyOrders] = useState([]);
 
   useEffect(() => {
-    const read = (key) => {
+    const token = localStorage.getItem("bf_auth_token");
+
+    if (!token || !user?.id) {
+      setActiveDemands([]);
+      setAvailableLots([]);
+      setPurchaseRequests([]);
+      setRecentProcurement([]);
+      setMyOrders([]);
+      return;
+    }
+
+    const authHeaders = {
+      Authorization: `Bearer ${token}`,
+    };
+
+    const fetchDashboardData = async () => {
       try {
-        return JSON.parse(localStorage.getItem(key) || "[]");
-      } catch {
-        return [];
+        const [
+          buyersResponse,
+          demandsResponse,
+          lotsResponse,
+          requestsResponse,
+          ordersResponse,
+        ] = await Promise.all([
+          fetch(`${API}/api/buyers`),
+          fetch(`${API}/api/buyer-demands`, {
+            headers: authHeaders,
+          }),
+          fetch(`${API}/api/lots`),
+          fetch(`${API}/api/purchase-requests/my`, {
+            headers: authHeaders,
+          }),
+          fetch(`${API}/api/orders/my`, {
+            headers: authHeaders,
+          }),
+        ]);
+
+        const [buyersData, demandsData, lotsData, requestsData, ordersData] =
+          await Promise.all([
+            buyersResponse.json(),
+            demandsResponse.json(),
+            lotsResponse.json(),
+            requestsResponse.json(),
+            ordersResponse.json(),
+          ]);
+
+        // Find the authenticated buyer's numeric Buyer.id.
+        const currentBuyer = Array.isArray(buyersData?.buyers)
+          ? buyersData.buyers.find(
+              (buyer) => String(buyer.userId) === String(user.id),
+            )
+          : null;
+
+        const buyerId = currentBuyer?.id;
+
+        // BUYER DEMANDS
+        if (demandsResponse.ok && demandsData?.success) {
+          const myDemands = (demandsData.demands || []).filter(
+            (demand) =>
+              String(demand.userId) === String(user.id) ||
+              (buyerId != null && String(demand.buyerId) === String(buyerId)),
+          );
+
+          setActiveDemands(
+            myDemands.filter((demand) => demand.status !== "closed"),
+          );
+        } else {
+          setActiveDemands([]);
+        }
+
+        // AVAILABLE LOTS
+        const lots = Array.isArray(lotsData) ? lotsData : lotsData?.lots || [];
+
+        setAvailableLots(
+          lots.filter((lot) => lot.status === "listed").slice(0, 4),
+        );
+
+        // PURCHASE REQUESTS
+        if (requestsResponse.ok && requestsData?.success) {
+          const requests = Array.isArray(requestsData.requests)
+            ? requestsData.requests
+            : [];
+
+          setPurchaseRequests(requests);
+        } else {
+          setPurchaseRequests([]);
+        }
+
+        // RECENT PROCUREMENT — normalize payment status consistently
+        const orders =
+          ordersResponse.ok &&
+          ordersData?.success &&
+          Array.isArray(ordersData.orders)
+            ? ordersData.orders
+            : [];
+
+        setRecentProcurement(
+          orders.slice(0, 3).map((order) => {
+            const payment = String(
+              order.paymentStatus || "pending",
+            ).toLowerCase();
+
+            const quality = String(order.qualityStatus || "").toLowerCase();
+
+            const quantity = String(order.quantityStatus || "").toLowerCase();
+
+            const delivery = String(
+              order.logisticsStatus || order.status || "",
+            ).toLowerCase();
+
+            const verificationRejected =
+              quality === "rejected" || quantity === "rejected";
+
+            const reviewComplete =
+              ["approved", "verified"].includes(quality) &&
+              ["approved", "verified"].includes(quantity) &&
+              delivery === "delivered";
+
+            let normalizedPayment;
+
+            if (verificationRejected) {
+              normalizedPayment = "Review Required";
+            } else if (["paid", "released"].includes(payment)) {
+              normalizedPayment = reviewComplete
+                ? "Released"
+                : "Review Required";
+            } else if (["pending", "protected"].includes(payment)) {
+              normalizedPayment = "Protected";
+            } else {
+              normalizedPayment = order.paymentStatus || "Pending";
+            }
+
+            return {
+              id: order.orderId || order._id,
+              orderId: order.orderId || order._id,
+              lotId: order.lotId,
+              commodity: order.commodityId,
+              quantity: `${order.quantity} Quintals`,
+              status: order.status || "Pending",
+              payment: normalizedPayment,
+              quality: order.qualityStatus || order.grade || "—",
+              transportation: order.logisticsStatus || "Pending",
+              quantityStatus: order.quantityStatus || "Pending",
+              amount: order.totalAmount,
+            };
+          }),
+        );
+
+        // MY ORDERS — REAL BACKEND DATA
+        if (ordersResponse.ok && ordersData?.success) {
+          setMyOrders(orders);
+          console.log("MY ORDERS:", orders);
+        } else {
+          setMyOrders([]);
+          console.error(
+            "Orders API failed:",
+            ordersResponse.status,
+            ordersData,
+          );
+        }
+      } catch (error) {
+        console.error("Buyer dashboard data fetch error:", error);
+
+        setActiveDemands([]);
+        setAvailableLots([]);
+        setPurchaseRequests([]);
+        setRecentProcurement([]);
+        setMyOrders([]);
       }
     };
 
-    setActiveDemands(
-      read("bf_buyer_demands").filter(
-        (d) => d.buyerId === user?.id && d.status !== "closed",
-      ),
-    );
+    fetchDashboardData();
+  }, [API, user?.id]);
 
-    setAvailableLots(
-      read("bf_seller_lots")
-        .filter((lot) => lot.status === "listed")
-        .slice(0, 4),
-    );
-
-    setRecentProcurement(
-      read("bf_buyer_orders")
-        .filter((order) => order.buyerId === user?.id)
-        .slice(0, 3),
-    );
-
+  useEffect(() => {
     const fetchPrices = async () => {
       try {
-        const response = await fetch(
-          "https://bharat-fasal.onrender.com/api/mandi-prices?limit=4",
-        );
+        const response = await fetch(`${API}/api/mandi-prices?limit=4`);
         const data = await response.json();
 
-        if (!response.ok || !Array.isArray(data.records)) return;
+        if (!response.ok || !Array.isArray(data.records)) {
+          setMarketWatch([]);
+          return;
+        }
 
         setMarketWatch(
           data.records
             .map((item) => ({
               commodityId: item.commodity || item.Commodity || "",
               mandi: item.market || item.Market || "",
-              price: Number(item.modal_price || item.Modal_Price || 0),
+              price: Number(
+                item.modalPrice ?? item.modal_price ?? item.Modal_Price ?? 0,
+              ),
               change: Number(item.change || 0),
             }))
             .filter((item) => item.commodityId && item.price > 0),
         );
       } catch (error) {
         console.error("Mandi price fetch error:", error);
+        setMarketWatch([]);
       }
     };
 
     fetchPrices();
-  }, [user?.id]);
+  }, [API]);
+
+  const normalizeGrade = (value) =>
+    String(value || "")
+      .replace(/^Grade\s+/i, "")
+      .trim()
+      .toLowerCase();
 
   const matchedLots = availableLots.filter((lot) =>
-    activeDemands.some((demand) => demand.crop === lot.commodityId),
+    activeDemands.some((demand) => {
+      const demandQuantity = Number(demand.quantity);
+      const lotQuantity = Number(lot.quantity);
+      const demandPrice = Number(demand.priceOffered);
+      const lotPrice = Number(lot.expectedPrice);
+
+      return (
+        String(demand.commodityId || demand.crop || "").toLowerCase() ===
+          String(lot.commodityId || "").toLowerCase() &&
+        normalizeGrade(demand.grade) === normalizeGrade(lot.grade) &&
+        lotQuantity >= demandQuantity &&
+        lotPrice <= demandPrice
+      );
+    }),
   );
 
-  const totalPurchased = recentProcurement.reduce(
-    (sum, order) => sum + Number(order.amount || 0),
+  const totalPurchased = myOrders.reduce(
+    (sum, order) => sum + Number(order.totalAmount || 0),
     0,
   );
   // =====================================================
@@ -183,24 +359,51 @@ export default function BuyerDashboardPage({ user }) {
   // SUBMIT QUESTION
   // =====================================================
 
-  const submitQuestion = () => {
-    if (!selectedOrder) return;
+  const submitQuestion = async () => {
+    if (!selectedOrder) {
+      alert("Please select an order.");
+      return;
+    }
 
     if (!questionText.trim()) {
       alert("Please describe the issue.");
       return;
     }
 
-    // Prototype submission.
-    // Later this can be replaced with API call.
-    console.log("RAISE QUESTION:", {
-      orderId: selectedOrder.id,
-      lotId: selectedOrder.lotId,
-      issue: questionType,
-      description: questionText,
-    });
+    const token = localStorage.getItem("bf_auth_token");
 
-    setQuestionSubmitted(true);
+    if (!token) {
+      alert("Please log in again.");
+      return;
+    }
+
+    try {
+      const response = await fetch(`${API}/api/grievances`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          orderId: selectedOrder.orderId ?? selectedOrder.id,
+          questionType,
+          questionText: questionText.trim(),
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.message || "Unable to submit question.");
+      }
+
+      setQuestionSubmitted(true);
+      setQuestionText("");
+
+    } catch (error) {
+      console.error("Raise question error:", error);
+      alert(error.message || "Something went wrong.");
+    }
   };
 
   return (
@@ -784,6 +987,103 @@ export default function BuyerDashboardPage({ user }) {
       </section>
 
       {/* =====================================================
+          MY PURCHASE REQUESTS
+      ===================================================== */}
+
+      <section>
+        <div className="mb-3 flex items-end justify-between">
+          <div>
+            <h2 className="text-lg font-bold text-gray-900">
+              My Purchase Requests
+            </h2>
+            <p className="mt-0.5 text-sm text-gray-500">
+              Track requests sent to farmers and FPOs
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => navigate("/buyers")}
+            className="text-sm font-semibold text-green-700 hover:text-green-800"
+          >
+            View all
+          </button>
+        </div>
+
+        <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
+          {purchaseRequests.length ? (
+            purchaseRequests.slice(0, 3).map((request, index) => {
+              const status = String(request.status || "pending").toLowerCase();
+
+              const statusClass =
+                status === "accepted"
+                  ? "bg-green-50 text-green-700"
+                  : status === "rejected"
+                    ? "bg-red-50 text-red-700"
+                    : "bg-amber-50 text-amber-700";
+
+              return (
+                <div
+                  key={request.requestId || request._id || index}
+                  className={`p-4 ${
+                    index !== Math.min(purchaseRequests.length, 3) - 1
+                      ? "border-b border-gray-100"
+                      : ""
+                  }`}
+                >
+                  <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                    <div className="flex items-start gap-3">
+                      <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-green-50 text-green-600">
+                        <ShoppingCart size={18} />
+                      </div>
+
+                      <div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h3 className="font-semibold text-gray-900">
+                            {t(request.commodityId) ||
+                              request.commodityId ||
+                              "Crop"}
+                          </h3>
+
+                          <span
+                            className={`rounded-full px-2.5 py-1 text-[11px] font-semibold capitalize ${statusClass}`}
+                          >
+                            {status}
+                          </span>
+                        </div>
+
+                        <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500">
+                          <span>Lot ID: {request.lotId || "—"}</span>
+                          <span>{request.quantity} Quintals</span>
+                          <span>Seller: {request.sellerName || "—"}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="text-left sm:text-right">
+                      <p className="text-sm font-bold text-gray-900">
+                        {formatCurrency(request.offeredPrice)}
+                        <span className="ml-1 text-xs font-normal text-gray-400">
+                          /q
+                        </span>
+                      </p>
+                      <p className="mt-1 text-xs text-gray-500">
+                        Total {formatCurrency(request.totalAmount)}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              );
+            })
+          ) : (
+            <p className="p-6 text-sm text-gray-500">
+              No purchase requests yet. Browse lots and send a request to buy.
+            </p>
+          )}
+        </div>
+      </section>
+
+      {/* =====================================================
           RECENT PROCUREMENT
       ===================================================== */}
 
@@ -875,6 +1175,28 @@ export default function BuyerDashboardPage({ user }) {
                     </div>
 
                     <div>
+                      <p className="text-gray-400">Quantity</p>
+
+                      <p className="mt-1 flex items-center gap-1 font-semibold text-gray-700">
+                        {String(order.quantityStatus || "—").toLowerCase() ===
+                        "rejected" ? (
+                          <>
+                            <span className="text-red-600">●</span>
+                            Rejected
+                          </>
+                        ) : (
+                          <>
+                            <CheckCircle2
+                              size={13}
+                              className="text-green-600"
+                            />
+                            {order.quantityStatus || "—"}
+                          </>
+                        )}
+                      </p>
+                    </div>
+
+                    <div>
                       <p className="text-gray-400">Transportation</p>
 
                       <p className="mt-1 flex items-center gap-1 font-semibold text-gray-700">
@@ -924,7 +1246,7 @@ export default function BuyerDashboardPage({ user }) {
             ))
           ) : (
             <p className="p-6 text-sm text-gray-500">
-              No procurement orders yet.
+              No accepted procurements yet.
             </p>
           )}
         </div>

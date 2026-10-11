@@ -240,30 +240,45 @@ router.patch("/:offerId/status", protect, async (req, res) => {
       offer.status = status;
 await offer.save();
 
+
 if (status === "accepted") {
   const existingOrder = await Order.findOne({
     offerId: offer.offerId,
   });
 
-  if (!existingOrder) {
-    await Order.create({
-      orderId: `BF-ORDER-${Date.now()}`,
-      offerId: offer.offerId,
-      lotId: offer.lotId,
-      buyerId: offer.buyerId,
-      buyerName: offer.buyerName,
-      sellerId: offer.sellerId,
-      sellerName: offer.sellerName,
-      commodityId: offer.commodityId,
-      quantity: offer.quantity,
-      pricePerQuintal: offer.offeredPrice,
-      totalAmount: offer.totalAmount,
-      status: "created",
-      paymentStatus: "pending",
-      logisticsStatus: "pending",
+
+if (!existingOrder) {
+  const lot = await Lot.findOne({ id: offer.lotId });
+
+  if (!lot) {
+    return res.status(404).json({
+      success: false,
+      message: "Lot not found for this offer.",
     });
   }
+
+  await Order.create({
+    orderId: `BF-ORDER-${Date.now()}`,
+    offerId: offer.offerId,
+    lotId: offer.lotId,
+    buyerId: offer.buyerId,
+    buyerName: offer.buyerName,
+    sellerId: offer.sellerId,
+    sellerName: offer.sellerName || lot.sellerName || "Seller",
+    commodityId: offer.commodityId,
+    quantity: offer.quantity,
+    location: lot.pickupLocation || lot.sellerLocation || "",
+    transport: lot.transportation || "",
+    transportCost: 0,
+    pricePerQuintal: offer.offeredPrice,
+    totalAmount: offer.totalAmount,
+    status: "created",
+    paymentStatus: "pending",
+    logisticsStatus: "pending",
+  });
 }
+}
+
 
 return res.json({
         success: true,

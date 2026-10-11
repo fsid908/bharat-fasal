@@ -58,6 +58,29 @@ const orderSchema = new mongoose.Schema(
       min: 1,
     },
 
+    location: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+
+    transport: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+
+    transportCost: {
+      type: Number,
+      min: 0,
+      default: 0,
+    },
+
+    expectedDelivery: {
+      type: Date,
+      default: null,
+    },
+
     pricePerQuintal: {
       type: Number,
       required: true,
@@ -95,6 +118,17 @@ const orderSchema = new mongoose.Schema(
     logisticsStatus: {
       type: String,
       enum: ["pending", "scheduled", "picked_up", "in_transit", "delivered"],
+      default: "pending",
+    },
+    qualityStatus: {
+      type: String,
+      enum: ["pending", "approved", "rejected"],
+      default: "pending",
+    },
+
+    quantityStatus: {
+      type: String,
+      enum: ["pending", "approved", "rejected"],
       default: "pending",
     },
   },

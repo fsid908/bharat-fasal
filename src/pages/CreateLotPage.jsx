@@ -150,11 +150,11 @@ export default function CreateLotPage({ user }) {
       createdAt: new Date().toISOString(),
 
       sellerId: user?.id,
-      sellerName: user?.name,
+      sellerName: user?.name || user?.companyName || "",
       sellerRole: user?.role,
-      sellerLocation: user?.location,
-      sellerDistrict: user?.district,
-      sellerState: user?.state,
+      sellerLocation: user?.location || "",
+      sellerDistrict: user?.district || "",
+      sellerState: user?.state || "",
 
       offers: [],
     };
