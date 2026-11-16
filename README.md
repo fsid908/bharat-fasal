@@ -329,5 +329,3 @@ Bharat Fasal is currently developed as an **academic / prototype project** for e
 <p align="center">
   <b>Built with ❤️ by Team Bharat Fasal</b>
 </p>
-
-<!-- Vercel production redeploy -->
