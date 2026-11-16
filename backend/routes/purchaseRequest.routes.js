@@ -3,7 +3,7 @@ import PurchaseRequest from "../models/purchaseRequest.model.js";
 import Lot from "../models/lot.model.js";
 import Buyer from "../models/buyer.model.js";
 import protect from "../middleware/auth.middleware.js";
-
+import mongoose from "mongoose";
 const router = express.Router();
 
 console.log("🔥 PURCHASE REQUEST ROUTES LOADED");
@@ -28,12 +28,13 @@ router.post("/", protect, async (req, res) => {
 
     const buyer = await Buyer.findOne({
       userId: req.user.userId,
+      verified: true,
     });
 
     if (!buyer) {
       return res.status(404).json({
         success: false,
-        message: "Buyer profile not found",
+        message: "Verified buyer profile not found",
       });
     }
 
@@ -108,7 +109,16 @@ router.post("/", protect, async (req, res) => {
 
 router.get("/", protect, async (req, res) => {
   try {
-    const requests = await PurchaseRequest.find().sort({ createdAt: -1 });
+    if (req.user.role !== "admin") {
+      return res.status(403).json({
+        success: false,
+        message: "Only admins can view all purchase requests",
+      });
+    }
+
+    const requests = await PurchaseRequest.find().sort({
+      createdAt: -1,
+    });
 
     return res.json({
       success: true,
@@ -189,6 +199,28 @@ router.get("/:requestId", protect, async (req, res) => {
       });
     }
 
+    const isAdmin = req.user.role === "admin";
+    const isSeller =
+      (req.user.role === "farmer" || req.user.role === "fpo") &&
+      String(request.sellerId) === String(req.user.userId);
+
+    let isBuyer = false;
+
+    if (req.user.role === "buyer") {
+      const buyer = await Buyer.findOne({
+        userId: req.user.userId,
+      });
+
+      isBuyer = buyer && String(request.buyerId) === String(buyer.id);
+    }
+
+    if (!isAdmin && !isSeller && !isBuyer) {
+      return res.status(403).json({
+        success: false,
+        message: "You are not authorized to view this request",
+      });
+    }
+
     return res.json({
       success: true,
       request,
@@ -203,66 +235,115 @@ router.get("/:requestId", protect, async (req, res) => {
   }
 });
 
+
 router.patch("/:requestId/status", protect, async (req, res) => {
-  try {
-    const { status } = req.body;
+  const { status } = req.body;
 
-    if (req.user.role !== "farmer" && req.user.role !== "fpo") {
-      return res.status(403).json({
-        success: false,
-        message: "Only sellers can update purchase requests",
-      });
-    }
-
-    if (!["accepted", "rejected"].includes(status)) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid request status",
-      });
-    }
-
-    const request = await PurchaseRequest.findOne({
-      requestId: req.params.requestId,
+  if (!["accepted", "rejected"].includes(status)) {
+    return res.status(400).json({
+      success: false,
+      message: "Invalid request status"
     });
+  }
 
-    if (!request) {
-      return res.status(404).json({
-        success: false,
-        message: "Purchase request not found",
-      });
-    }
+  if (req.user.role !== "farmer" && req.user.role !== "fpo") {
+    return res.status(403).json({
+      success: false,
+      message: "Only sellers can update purchase requests"
+    });
+  }
 
-    if (String(request.sellerId) !== String(req.user.userId)) {
-      return res.status(403).json({
-        success: false,
-        message: "You are not authorized to update this request",
-      });
-    }
+  const session = await mongoose.startSession();
 
-    if (request.status !== "pending") {
-      return res.status(400).json({
-        success: false,
-        message: "Only pending requests can be updated",
-      });
-    }
+  try {
+    let updatedRequest;
 
-    request.status = status;
+    await session.withTransaction(async () => {
+      const request = await PurchaseRequest.findOne({
+        requestId: req.params.requestId
+      }).session(session);
 
-    await request.save();
+      if (!request) {
+        throw new Error("REQUEST_NOT_FOUND");
+      }
+
+      if (String(request.sellerId) !== String(req.user.userId)) {
+        throw new Error("NOT_AUTHORIZED");
+      }
+
+      if (request.status !== "pending") {
+        throw new Error("REQUEST_ALREADY_PROCESSED");
+      }
+
+      if (status === "accepted") {
+        const lot = await Lot.findOneAndUpdate(
+          {
+            id: request.lotId,
+            status: "listed"
+          },
+          {
+            $set: { status: "sold" }
+          },
+          {
+            new: true,
+            session
+          }
+        );
+
+        if (!lot) {
+          throw new Error("LOT_NOT_AVAILABLE");
+        }
+      }
+
+      updatedRequest = await PurchaseRequest.findOneAndUpdate(
+        {
+          requestId: req.params.requestId,
+          sellerId: String(req.user.userId),
+          status: "pending"
+        },
+        {
+          $set: { status }
+        },
+        {
+          new: true,
+          runValidators: true,
+          session
+        }
+      );
+
+      if (!updatedRequest) {
+        throw new Error("REQUEST_ALREADY_PROCESSED");
+      }
+    });
 
     return res.json({
       success: true,
       message: `Purchase request ${status} successfully`,
-      request,
+      request: updatedRequest
     });
   } catch (error) {
     console.error("Update purchase request status error:", error);
 
-    return res.status(500).json({
+    const errors = {
+      REQUEST_NOT_FOUND: [404, "Purchase request not found"],
+      NOT_AUTHORIZED: [403, "You are not authorized to update this request"],
+      REQUEST_ALREADY_PROCESSED: [409, "This request has already been processed"],
+      LOT_NOT_AVAILABLE: [409, "This lot is no longer available"]
+    };
+
+    const [code, message] = errors[error.message] || [
+      500,
+      "Failed to update purchase request status"
+    ];
+
+    return res.status(code).json({
       success: false,
-      message: "Failed to update purchase request status",
+      message
     });
+  } finally {
+    await session.endSession();
   }
 });
+
 
 export default router;

@@ -5,7 +5,9 @@ import { formatCurrency } from "../utils/formatters";
 
 export default function LogisticsPage() {
   const { t } = useTranslation();
-  const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
+  const API = (
+  import.meta.env.VITE_API_URL || "https://bharat-fasal.onrender.com"
+).replace(/\/$/, "");
 
   const [tab, setTab] = useState("orders");
   const [calcQty, setCalcQty] = useState(50);

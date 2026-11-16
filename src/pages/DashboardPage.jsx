@@ -36,7 +36,9 @@ export default function DashboardPage({ user }) {
   const [marketNews, setMarketNews] = useState([]);
 
   useEffect(() => {
-    const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
+    const API = (
+  import.meta.env.VITE_API_URL || "https://bharat-fasal.onrender.com"
+).replace(/\/$/, "");
     const userId = currentUser?.id || currentUser?._id || currentUser?.userId;
 
     if (!userId) {
@@ -97,7 +99,9 @@ export default function DashboardPage({ user }) {
   }, [currentUser?.id, currentUser?._id, currentUser?.userId]);
 
   useEffect(() => {
-    const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
+    const API = (
+  import.meta.env.VITE_API_URL || "https://bharat-fasal.onrender.com"
+).replace(/\/$/, "");
     let cancelled = false;
 
     const fetchPurchaseRequests = async () => {
@@ -152,7 +156,9 @@ export default function DashboardPage({ user }) {
   }, [currentUser?.id, currentUser?._id, currentUser?.userId]);
 
   useEffect(() => {
-    const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
+    const API = (
+  import.meta.env.VITE_API_URL || "https://bharat-fasal.onrender.com"
+).replace(/\/$/, "");
     let cancelled = false;
 
     const fetchMarketNews = async () => {
@@ -191,7 +197,9 @@ export default function DashboardPage({ user }) {
 
     const fetchMandiPrices = async () => {
       try {
-        const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
+        const API = (
+  import.meta.env.VITE_API_URL || "https://bharat-fasal.onrender.com"
+).replace(/\/$/, "");
         const response = await fetch(`${API}/api/mandi-prices?limit=20`, {
           headers: { Accept: "application/json" },
         });
@@ -314,7 +322,7 @@ export default function DashboardPage({ user }) {
       setRequestActionLoading(requestId);
 
       const response = await fetch(
-        `${import.meta.env.VITE_API_URL || "http://localhost:5000"}/api/purchase-requests/${requestId}/status`,
+        `${(import.meta.env.VITE_API_URL || "https://bharat-fasal.onrender.com").replace(/\/$/, "")}/api/purchase-requests/${requestId}/status`,
         {
           method: "PATCH",
           headers: {

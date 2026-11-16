@@ -36,7 +36,9 @@ export default function AdminDashboardPage({ user }) {
   // VERIFICATION DATA
   // =========================================================
 
-  const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
+  const API = (
+  import.meta.env.VITE_API_URL || "https://bharat-fasal.onrender.com"
+).replace(/\/$/, "");
 
   const getAuthHeaders = () => {
     const token = localStorage.getItem("bf_auth_token");

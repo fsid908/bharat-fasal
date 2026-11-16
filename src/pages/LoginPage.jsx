@@ -454,22 +454,6 @@ export default function LoginPage({ onLogin }) {
                 </p>
               </div>
 
-              {/* DEMO OTP */}
-
-              {/* <div className="bg-primary-50 border border-primary-100 rounded-xl p-3 mb-5 text-center"> */}
-
-              {/* <p className="text-xs text-primary-600">
-                  Demo OTP
-                </p>
-
-                <p className="text-xl font-bold tracking-[0.35em] text-primary-800">
-                  1234
-                </p> */}
-
-              {/* </div> */}
-
-              {/* OTP */}
-
               <div className="flex justify-center gap-2 mb-5">
                 {[0, 1, 2, 3].map((i) => (
                   <input

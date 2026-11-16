@@ -85,7 +85,10 @@ export default function CreateLotPage({ user }) {
 
     if (!formData.quantity) {
       newErrors.quantity = "Please enter available quantity.";
-    } else if (Number(formData.quantity) <= 0) {
+    } else if (
+      !Number.isFinite(Number(formData.quantity)) ||
+      Number(formData.quantity) <= 0
+    ) {
       newErrors.quantity = "Quantity must be greater than 0.";
     }
 
@@ -95,7 +98,10 @@ export default function CreateLotPage({ user }) {
 
     if (!formData.expectedPrice) {
       newErrors.expectedPrice = "Please enter expected price.";
-    } else if (Number(formData.expectedPrice) <= 0) {
+    } else if (
+      !Number.isFinite(Number(formData.expectedPrice)) ||
+      Number(formData.expectedPrice) <= 0
+    ) {
       newErrors.expectedPrice = "Price must be greater than 0.";
     }
 
@@ -164,12 +170,15 @@ export default function CreateLotPage({ user }) {
     // -----------------------------------------------
 
     try {
-      const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5000";
+      const API_BASE = (
+        import.meta.env.VITE_API_URL || "https://bharat-fasal.onrender.com"
+      ).replace(/\/$/, "");
 
       const response = await fetch(`${API_BASE}/api/lots`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("bf_auth_token")}`,
         },
         body: JSON.stringify(newLot),
       });

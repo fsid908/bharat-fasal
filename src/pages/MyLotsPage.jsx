@@ -227,8 +227,7 @@ export default function MyLotsPage({ user }) {
       try {
         setLoadingLots(true);
 
-        const API_BASE =
-          import.meta.env.VITE_API_URL || "http://localhost:5000";
+        import.meta.env.VITE_API_URL || "https://bharat-fasal.onrender.com";
 
         const response = await fetch(`${API_BASE}/api/lots`);
 

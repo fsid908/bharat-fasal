@@ -44,9 +44,10 @@ const lotSchema = new mongoose.Schema(
     },
 
     status: {
-      type: String,
-      default: "listed",
-    },
+  type: String,
+  enum: ["listed", "sold"],
+  default: "listed",
+},
 
     createdAt: {
       type: Date,

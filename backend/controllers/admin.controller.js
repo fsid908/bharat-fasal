@@ -1,7 +1,8 @@
 import Verification from "../models/verification.model.js";
 import User from "../models/user.model.js";
 import Buyer from "../models/buyer.model.js";
-
+import mongoose from "mongoose";
+import Counter from "../models/counter.model.js";
 export const getPendingVerifications = async (req, res) => {
   try {
     const verifications = await Verification.find({
@@ -56,129 +57,151 @@ export const getVerificationById = async (req, res) => {
 };
 
 export const approveVerification = async (req, res) => {
+  const session = await mongoose.startSession();
+
   try {
-    const { type } = req.body;
+    let approvedBuyer;
 
-    const allowedTypes = [
-      "processor",
-      "trader",
-      "institutional",
-    ];
+    await session.withTransaction(async () => {
+      const { type } = req.body;
 
-    if (!allowedTypes.includes(type)) {
-      return res.status(400).json({
-        success: false,
-        message:
-          "Valid buyer marketplace type is required: processor, trader, or institutional",
-      });
-    }
+      if (!["processor", "trader", "institutional"].includes(type)) {
+        throw Object.assign(new Error("Invalid buyer type"), {
+          statusCode: 400,
+        });
+      }
 
-    const verification = await Verification.findById(
-      req.params.id
-    );
+      const verification = await Verification.findById(req.params.id).session(
+        session
+      );
 
-    if (!verification) {
-      return res.status(404).json({
-        success: false,
-        message: "Verification not found",
-      });
-    }
+      if (!verification) {
+        throw Object.assign(new Error("Verification not found"), {
+          statusCode: 404,
+        });
+      }
 
-    if (verification.type !== "buyer") {
-      return res.status(400).json({
-        success: false,
-        message: "Only buyer verification can create a buyer profile",
-      });
-    }
+      if (verification.type !== "buyer") {
+        throw Object.assign(
+          new Error("This verification is not for a buyer"),
+          { statusCode: 400 }
+        );
+      }
 
-    if (verification.status === "approved") {
-      return res.status(400).json({
-        success: false,
-        message: "Verification is already approved",
-      });
-    }
+      if (!["pending", "under_review"].includes(verification.status)) {
+        throw Object.assign(
+          new Error("Only pending or under-review verifications can be approved"),
+          { statusCode: 400 }
+        );
+      }
 
-    const user = await User.findById(verification.userId);
+      const user = await User.findById(verification.userId).session(session);
 
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: "Buyer user account not found",
-      });
-    }
+      if (!user || user.role !== "buyer") {
+        throw Object.assign(new Error("Valid buyer account not found"), {
+          statusCode: 404,
+        });
+      }
 
-    if (user.role !== "buyer") {
-      return res.status(400).json({
-        success: false,
-        message: "Linked user is not a buyer",
-      });
-    }
+      const existingBuyer = await Buyer.findOne({
+        userId: user._id,
+      }).session(session);
 
-    // Prevent duplicate buyer profile
-    const existingBuyer = await Buyer.findOne({
-      userId: user._id,
+      if (existingBuyer) {
+        throw Object.assign(
+          new Error("Buyer profile already exists for this user"),
+          { statusCode: 409 }
+        );
+      }
+
+      const lastBuyer = await Buyer.findOne()
+  .sort({ id: -1 })
+  .select("id")
+  .session(session);
+
+const highestBuyerId = lastBuyer?.id ?? 0;
+
+const counter = await Counter.findOneAndUpdate(
+  { _id: "buyer" },
+  [
+    {
+      $set: {
+        sequence: {
+          $add: [
+            {
+              $max: [
+                { $ifNull: ["$sequence", 0] },
+                highestBuyerId,
+              ],
+            },
+            1,
+          ],
+        },
+      },
+    },
+  ],
+  {
+    new: true,
+    upsert: true,
+    session,
+  }
+);
+
+const nextBuyerId = counter.sequence;
+
+      const [buyer] = await Buyer.create(
+        [
+          {
+            userId: user._id,
+            verificationId: verification._id,
+            id: nextBuyerId,
+            name: user.organizationName || user.name,
+            businessType: user.businessType,
+            type,
+            rating: 0,
+            verified: true,
+            location: user.village || user.district || user.state || "Not provided",
+            distance: 0,
+            commodities: [],
+            totalTransactions: 0,
+            avgPaymentDays: 0,
+          },
+        ],
+        { session }
+      );
+
+      verification.status = "approved";
+      verification.rejectionReason = "";
+      verification.reviewedAt = new Date();
+
+      await verification.save({ session });
+
+      approvedBuyer = buyer;
     });
-
-    if (existingBuyer) {
-      return res.status(409).json({
-        success: false,
-        message: "Buyer profile already exists",
-      });
-    }
-
-    // Generate next marketplace buyer ID
-    const lastBuyer = await Buyer.findOne()
-      .sort({ id: -1 })
-      .select("id");
-
-    const nextBuyerId = lastBuyer
-      ? lastBuyer.id + 1
-      : 1;
-
-    const buyer = await Buyer.create({
-      userId: user._id,
-      verificationId: verification._id,
-      id: nextBuyerId,
-
-      name: user.organizationName || user.name,
-
-      businessType: user.businessType,
-
-      type,
-
-      rating: 0,
-      verified: true,
-
-      location: [user.district, user.state]
-        .filter(Boolean)
-        .join(", "),
-
-      distance: 0,
-      commodities: [],
-      totalTransactions: 0,
-      avgPaymentDays: 0,
-    });
-
-    // Mark verification approved
-    verification.status = "approved";
-    verification.rejectionReason = "";
-    verification.reviewedAt = new Date();
-
-    await verification.save();
 
     return res.status(200).json({
       success: true,
       message: "Buyer verification approved successfully",
-      buyer,
-      verification,
+      buyer: approvedBuyer,
     });
   } catch (error) {
     console.error("Approve verification error:", error);
 
-    return res.status(500).json({
+    if (error.code === 11000) {
+      return res.status(409).json({
+        success: false,
+        message: "Buyer profile already exists or ID conflict occurred",
+      });
+    }
+
+    return res.status(error.statusCode || 500).json({
       success: false,
-      message: "Unable to approve verification",
+      message: error.statusCode
+        ? error.message
+        : "Failed to approve buyer verification",
     });
+  } finally {
+    await session.endSession();
   }
 };
 

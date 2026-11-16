@@ -29,7 +29,9 @@ const cropOptions = [
 
 const gradeOptions = ["All Grades", "Grade A", "Grade B", "Grade C", "Premium"];
 
-const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
+const API = (
+  import.meta.env.VITE_API_URL || "https://bharat-fasal.onrender.com"
+).replace(/\/$/, "");
 
 export default function BrowseLotsPage({ user }) {
   const [availableLots, setAvailableLots] = useState([]);

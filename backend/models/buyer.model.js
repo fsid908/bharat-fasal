@@ -53,9 +53,9 @@ const buyerSchema = new mongoose.Schema(
     },
 
     verified: {
-      type: Boolean,
-      default: true,
-    },
+  type: Boolean,
+  default: false,
+},
 
     location: {
       type: String,

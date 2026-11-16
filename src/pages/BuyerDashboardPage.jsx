@@ -69,7 +69,9 @@ export default function BuyerDashboardPage({ user }) {
   // REAL DATA
   // =====================================================
 
-  const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
+  const API = (
+  import.meta.env.VITE_API_URL || "https://bharat-fasal.onrender.com"
+).replace(/\/$/, "");
 
   const [activeDemands, setActiveDemands] = useState([]);
   const [availableLots, setAvailableLots] = useState([]);
@@ -95,6 +97,7 @@ export default function BuyerDashboardPage({ user }) {
     };
 
     const fetchDashboardData = async () => {
+
       try {
         const [
           buyersResponse,
@@ -116,19 +119,25 @@ export default function BuyerDashboardPage({ user }) {
           }),
         ]);
 
-        const [buyersData, demandsData, lotsData, requestsData, ordersData] =
-          await Promise.all([
-            buyersResponse.json(),
-            demandsResponse.json(),
-            lotsResponse.json(),
-            requestsResponse.json(),
-            ordersResponse.json(),
-          ]);
+        const [
+          buyersData,
+          demandsData,
+          lotsData,
+          requestsData,
+          ordersData,
+        ] = await Promise.all([
+          buyersResponse.json(),
+          demandsResponse.json(),
+          lotsResponse.json(),
+          requestsResponse.json(),
+          ordersResponse.json(),
+        ]);
 
         // Find the authenticated buyer's numeric Buyer.id.
         const currentBuyer = Array.isArray(buyersData?.buyers)
           ? buyersData.buyers.find(
-              (buyer) => String(buyer.userId) === String(user.id),
+              (buyer) =>
+                String(buyer.userId) === String(user.id),
             )
           : null;
 
@@ -139,18 +148,23 @@ export default function BuyerDashboardPage({ user }) {
           const myDemands = (demandsData.demands || []).filter(
             (demand) =>
               String(demand.userId) === String(user.id) ||
-              (buyerId != null && String(demand.buyerId) === String(buyerId)),
+              (buyerId != null &&
+                String(demand.buyerId) === String(buyerId)),
           );
 
           setActiveDemands(
-            myDemands.filter((demand) => demand.status !== "closed"),
+            myDemands.filter(
+              (demand) => demand.status !== "closed",
+            ),
           );
         } else {
           setActiveDemands([]);
         }
 
         // AVAILABLE LOTS
-        const lots = Array.isArray(lotsData) ? lotsData : lotsData?.lots || [];
+        const lots = Array.isArray(lotsData)
+          ? lotsData
+          : lotsData?.lots || [];
 
         setAvailableLots(
           lots.filter((lot) => lot.status === "listed").slice(0, 4),
@@ -163,82 +177,46 @@ export default function BuyerDashboardPage({ user }) {
             : [];
 
           setPurchaseRequests(requests);
+
+          setRecentProcurement(
+  ordersResponse.ok && ordersData?.success
+    ? (Array.isArray(ordersData.orders) ? ordersData.orders : [])
+        .slice(0, 3)
+        .map((order) => ({
+          id: order.orderId || order._id,
+          orderId: order.orderId || order._id,
+          lotId: order.lotId,
+          commodity: order.commodityId,
+          quantity: `${order.quantity} Quintals`,
+          status: order.status || "Pending",
+          payment: order.paymentStatus || "Pending",
+          quality: order.grade || "—",
+          transportation: order.logisticsStatus || "Pending",
+          amount: order.totalAmount,
+        }))
+    : [],
+);
         } else {
           setPurchaseRequests([]);
+          setRecentProcurement([]);
         }
-
-        // RECENT PROCUREMENT — normalize payment status consistently
-        const orders =
-          ordersResponse.ok &&
-          ordersData?.success &&
-          Array.isArray(ordersData.orders)
-            ? ordersData.orders
-            : [];
-
-        setRecentProcurement(
-          orders.slice(0, 3).map((order) => {
-            const payment = String(
-              order.paymentStatus || "pending",
-            ).toLowerCase();
-
-            const quality = String(order.qualityStatus || "").toLowerCase();
-
-            const quantity = String(order.quantityStatus || "").toLowerCase();
-
-            const delivery = String(
-              order.logisticsStatus || order.status || "",
-            ).toLowerCase();
-
-            const verificationRejected =
-              quality === "rejected" || quantity === "rejected";
-
-            const reviewComplete =
-              ["approved", "verified"].includes(quality) &&
-              ["approved", "verified"].includes(quantity) &&
-              delivery === "delivered";
-
-            let normalizedPayment;
-
-            if (verificationRejected) {
-              normalizedPayment = "Review Required";
-            } else if (["paid", "released"].includes(payment)) {
-              normalizedPayment = reviewComplete
-                ? "Released"
-                : "Review Required";
-            } else if (["pending", "protected"].includes(payment)) {
-              normalizedPayment = "Protected";
-            } else {
-              normalizedPayment = order.paymentStatus || "Pending";
-            }
-
-            return {
-              id: order.orderId || order._id,
-              orderId: order.orderId || order._id,
-              lotId: order.lotId,
-              commodity: order.commodityId,
-              quantity: `${order.quantity} Quintals`,
-              status: order.status || "Pending",
-              payment: normalizedPayment,
-              quality: order.qualityStatus || order.grade || "—",
-              transportation: order.logisticsStatus || "Pending",
-              quantityStatus: order.quantityStatus || "Pending",
-              amount: order.totalAmount,
-            };
-          }),
-        );
 
         // MY ORDERS — REAL BACKEND DATA
-        if (ordersResponse.ok && ordersData?.success) {
-          setMyOrders(orders);
-          console.log("MY ORDERS:", orders);
-        } else {
-          setMyOrders([]);
-          console.error(
-            "Orders API failed:",
-            ordersResponse.status,
-            ordersData,
-          );
-        }
+if (ordersResponse.ok && ordersData?.success) {
+  const orders = Array.isArray(ordersData.orders)
+    ? ordersData.orders
+    : [];
+
+  setMyOrders(orders);
+  console.log("MY ORDERS:", orders);
+} else {
+  setMyOrders([]);
+  console.error(
+    "Orders API failed:",
+    ordersResponse.status,
+    ordersData,
+  );
+}
       } catch (error) {
         console.error("Buyer dashboard data fetch error:", error);
 
@@ -252,6 +230,7 @@ export default function BuyerDashboardPage({ user }) {
 
     fetchDashboardData();
   }, [API, user?.id]);
+
 
   useEffect(() => {
     const fetchPrices = async () => {
@@ -308,8 +287,8 @@ export default function BuyerDashboardPage({ user }) {
     }),
   );
 
-  const totalPurchased = myOrders.reduce(
-    (sum, order) => sum + Number(order.totalAmount || 0),
+  const totalPurchased = recentProcurement.reduce(
+    (sum, order) => sum + Number(order.amount || 0),
     0,
   );
   // =====================================================
@@ -359,51 +338,24 @@ export default function BuyerDashboardPage({ user }) {
   // SUBMIT QUESTION
   // =====================================================
 
-  const submitQuestion = async () => {
-    if (!selectedOrder) {
-      alert("Please select an order.");
-      return;
-    }
+  const submitQuestion = () => {
+    if (!selectedOrder) return;
 
     if (!questionText.trim()) {
       alert("Please describe the issue.");
       return;
     }
 
-    const token = localStorage.getItem("bf_auth_token");
+    // Prototype submission.
+    // Later this can be replaced with API call.
+    console.log("RAISE QUESTION:", {
+      orderId: selectedOrder.id,
+      lotId: selectedOrder.lotId,
+      issue: questionType,
+      description: questionText,
+    });
 
-    if (!token) {
-      alert("Please log in again.");
-      return;
-    }
-
-    try {
-      const response = await fetch(`${API}/api/grievances`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          orderId: selectedOrder.orderId ?? selectedOrder.id,
-          questionType,
-          questionText: questionText.trim(),
-        }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok || !data.success) {
-        throw new Error(data.message || "Unable to submit question.");
-      }
-
-      setQuestionSubmitted(true);
-      setQuestionText("");
-
-    } catch (error) {
-      console.error("Raise question error:", error);
-      alert(error.message || "Something went wrong.");
-    }
+    setQuestionSubmitted(true);
   };
 
   return (
@@ -1171,28 +1123,6 @@ export default function BuyerDashboardPage({ user }) {
                       <p className="mt-1 flex items-center gap-1 font-semibold text-gray-700">
                         <CheckCircle2 size={13} className="text-green-600" />
                         {order.quality || order.qualityStatus || "—"}
-                      </p>
-                    </div>
-
-                    <div>
-                      <p className="text-gray-400">Quantity</p>
-
-                      <p className="mt-1 flex items-center gap-1 font-semibold text-gray-700">
-                        {String(order.quantityStatus || "—").toLowerCase() ===
-                        "rejected" ? (
-                          <>
-                            <span className="text-red-600">●</span>
-                            Rejected
-                          </>
-                        ) : (
-                          <>
-                            <CheckCircle2
-                              size={13}
-                              className="text-green-600"
-                            />
-                            {order.quantityStatus || "—"}
-                          </>
-                        )}
                       </p>
                     </div>
 
