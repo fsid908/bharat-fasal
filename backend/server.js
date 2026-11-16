@@ -569,6 +569,25 @@ app.get("/", (req, res) => {
 });
 
 // ========================================
+// CENTRAL ERROR HANDLER
+// ========================================
+
+app.use((error, req, res, next) => {
+  const statusCode = error.statusCode || 500;
+
+  if (statusCode >= 500) {
+    console.error("API error:", error);
+  }
+
+  return res.status(statusCode).json({
+    success: false,
+    message: error.isOperational
+      ? error.message
+      : "Internal server error",
+  });
+});
+
+// ========================================
 // CONNECT TO DATABASE
 // ========================================
 

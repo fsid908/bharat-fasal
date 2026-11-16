@@ -16,6 +16,8 @@ import {
   BriefcaseBusiness,
 } from "lucide-react";
 
+const API = (import.meta.env.VITE_API_URL || "http://localhost:5000").replace(/\/$/, "");
+
 const roles = [
   {
     id: "farmer",
@@ -183,7 +185,7 @@ const RegisterPage = ({ onLogin }) => {
 
   try {
     // Send registration data to backend
-    const response = await fetch("https://bharat-fasal.onrender.com/api/auth/register", {
+    fetch(`${API}/api/auth/register`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

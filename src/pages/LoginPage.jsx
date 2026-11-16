@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
@@ -9,12 +10,12 @@ import {
   EyeOff,
 } from "lucide-react";
 
+const API = (
+  import.meta.env.VITE_API_URL || "http://localhost:5000"
+).replace(/\/$/, "");
+
 export default function LoginPage({ onLogin }) {
   const { t, i18n } = useTranslation();
-
-  // ================================
-  // FORM STATES
-  // ================================
 
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
@@ -26,199 +27,177 @@ export default function LoginPage({ onLogin }) {
 
   const currentLanguage = i18n.language;
 
-  // ================================
-  // LANGUAGE
-  // ================================
-
   const handleLanguageChange = (e) => {
     const lang = e.target.value;
 
     i18n.changeLanguage(lang);
-
-    document.documentElement.setAttribute("dir", lang === "ur" ? "rtl" : "ltr");
-
+    document.documentElement.setAttribute(
+      "dir",
+      lang === "ur" ? "rtl" : "ltr"
+    );
     document.documentElement.setAttribute("lang", lang);
   };
 
-  // ================================
-  // PASSWORD LOGIN
-  // ================================
-
   const handlePasswordLogin = async () => {
-  if (phone.length !== 10) {
-    alert("Please enter a valid 10 digit mobile number");
-    return;
-  }
-
-  if (password.length < 6) {
-    alert("Please enter a valid password");
-    return;
-  }
-
-  try {
-    const response = await fetch("https://bharat-fasal.onrender.com/api/auth/login", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        mobile: phone,
-        password: password,
-      }),
-    });
-
-    const data = await response.json();
-
-    if (!response.ok || !data.success) {
-      alert(data.message || "Login failed");
+    if (phone.length !== 10) {
+      alert("Please enter a valid 10 digit mobile number");
       return;
     }
 
-    // Save JWT token
-    localStorage.setItem("bf_auth_token", data.token);
+    if (password.length < 6) {
+      alert("Please enter a valid password");
+      return;
+    }
 
-    // Create user object for existing frontend flow
-    const user = {
-      id: data.user.id,
-      name: data.user.name,
-      companyName: data.user.organizationName || "",
-      email: data.user.email || "",
-      role: data.user.role,
-      location: data.user.village || "",
-      phone: data.user.mobile,
-      district: data.user.district || "",
-      state: data.user.state || "",
-    };
+    try {
+      const response = await fetch(`${API}/api/auth/login`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          mobile: phone,
+          password,
+        }),
+      });
 
-    console.log("LOGIN USER:", user);
+      const data = await response.json();
 
-    // Existing dashboard/login flow
-    onLogin(data.user.role, user);
+      if (!response.ok || !data.success) {
+        alert(data.message || "Login failed");
+        return;
+      }
 
-  } catch (error) {
-    console.error("Login error:", error);
-    alert("Unable to connect to server. Please make sure backend is running.");
-  }
-};
-  // ================================
-  // FORGOT PASSWORD - SEND OTP
-  // ================================
+      localStorage.setItem("bf_auth_token", data.token);
+
+      const user = {
+        id: data.user.id,
+        name: data.user.name,
+        companyName: data.user.organizationName || "",
+        email: data.user.email || "",
+        role: data.user.role,
+        location: data.user.village || "",
+        phone: data.user.mobile,
+        district: data.user.district || "",
+        state: data.user.state || "",
+      };
+
+      console.log("LOGIN USER:", user);
+      onLogin(data.user.role, user);
+    } catch (error) {
+      console.error("Login error:", error);
+      alert(
+        "Unable to connect to server. Please make sure backend is running."
+      );
+    }
+  };
 
   const handleSendOtp = async () => {
-  if (phone.length !== 10) {
-    alert("Please enter a valid 10 digit mobile number");
-    return;
-  }
-
-  try {
-    const response = await fetch(
-      "https://bharat-fasal.onrender.com/api/auth/forgot-password/send-otp",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          mobile: phone,
-        }),
-      }
-    );
-
-    const data = await response.json();
-
-    if (!response.ok || !data.success) {
-      alert(data.message || "Unable to send OTP");
+    if (phone.length !== 10) {
+      alert("Please enter a valid 10 digit mobile number");
       return;
     }
 
-    setOtpSent(true);
-    setOtp("");
+    try {
+      const response = await fetch(
+        `${API}/api/auth/forgot-password/send-otp`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            mobile: phone,
+          }),
+        }
+      );
 
-    alert("OTP generated successfully. Check the backend terminal.");
-  } catch (error) {
-    console.error("Send OTP error:", error);
-    alert("Unable to connect to server. Please try again.");
-  }
-};
+      const data = await response.json();
 
-  // ================================
-  // FORGOT PASSWORD - RESET
-  // ================================
+      if (!response.ok || !data.success) {
+        alert(data.message || "Unable to send OTP");
+        return;
+      }
+
+      setOtpSent(true);
+      setOtp("");
+
+      alert("OTP generated successfully. Check the backend terminal.");
+    } catch (error) {
+      console.error("Send OTP error:", error);
+      alert("Unable to connect to server. Please try again.");
+    }
+  };
 
   const handleVerify = async () => {
-  if (otp.length !== 4) {
-    alert("Please enter 4 digit OTP");
-    return;
-  }
-
-  if (newPassword.length < 6) {
-    alert("New password must be at least 6 characters");
-    return;
-  }
-
-  try {
-    // First verify OTP
-    const verifyResponse = await fetch(
-      "https://bharat-fasal.onrender.com/api/auth/forgot-password/verify-otp",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          mobile: phone,
-          otp: otp,
-        }),
-      }
-    );
-
-    const verifyData = await verifyResponse.json();
-
-    if (!verifyResponse.ok || !verifyData.success) {
-      alert(verifyData.message || "Invalid OTP");
+    if (otp.length !== 4) {
+      alert("Please enter 4 digit OTP");
       return;
     }
 
-    // Reset password
-    const resetResponse = await fetch(
-      "https://bharat-fasal.onrender.com/api/auth/forgot-password/reset",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          mobile: phone,
-          otp: otp,
-          newPassword: newPassword,
-        }),
-      }
-    );
-
-    const resetData = await resetResponse.json();
-
-    if (!resetResponse.ok || !resetData.success) {
-      alert(resetData.message || "Unable to reset password");
+    if (newPassword.length < 6) {
+      alert("New password must be at least 6 characters");
       return;
     }
 
-    alert("Password reset successfully. Please login with your new password.");
+    try {
+      const verifyResponse = await fetch(
+        `${API}/api/auth/forgot-password/verify-otp`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            mobile: phone,
+            otp,
+          }),
+        }
+      );
 
-    setOtpSent(false);
-    setOtp("");
-    setNewPassword("");
-    setShowNewPassword(false);
-    setPassword("");
+      const verifyData = await verifyResponse.json();
 
-  } catch (error) {
-    console.error("Password reset error:", error);
-    alert("Unable to connect to server. Please try again.");
-  }
-};
+      if (!verifyResponse.ok || !verifyData.success) {
+        alert(verifyData.message || "Invalid OTP");
+        return;
+      }
 
-  // ================================
-  // VOICE
-  // ================================
+      const resetResponse = await fetch(
+        `${API}/api/auth/forgot-password/reset`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            mobile: phone,
+            otp,
+            newPassword,
+          }),
+        }
+      );
+
+      const resetData = await resetResponse.json();
+
+      if (!resetResponse.ok || !resetData.success) {
+        alert(resetData.message || "Unable to reset password");
+        return;
+      }
+
+      alert(
+        "Password reset successfully. Please login with your new password."
+      );
+
+      setOtpSent(false);
+      setOtp("");
+      setNewPassword("");
+      setShowNewPassword(false);
+      setPassword("");
+    } catch (error) {
+      console.error("Password reset error:", error);
+      alert("Unable to connect to server. Please try again.");
+    }
+  };
 
   const speak = () => {
     if (!("speechSynthesis" in window)) return;
@@ -239,10 +218,10 @@ export default function LoginPage({ onLogin }) {
 
     const voiceLanguage = languageVoiceMap[currentLanguage] || "hi-IN";
 
-    const text = forgotPassword
+    const text = otpSent
       ? currentLanguage === "hi"
-        ? "अपना मोबाइल नंबर डालें। ओटीपी से सत्यापन करें और नया पासवर्ड बनाएं।"
-        : "Enter your mobile number, verify with OTP, and create a new password."
+        ? "अपना ओटीपी डालें और नया पासवर्ड बनाएं।"
+        : "Enter your OTP and create a new password."
       : t("login_instruction", {
           defaultValue:
             currentLanguage === "hi"
@@ -253,7 +232,6 @@ export default function LoginPage({ onLogin }) {
     window.speechSynthesis.cancel();
 
     const speech = new SpeechSynthesisUtterance(text);
-
     speech.lang = voiceLanguage;
     speech.rate = 0.85;
 
@@ -262,10 +240,6 @@ export default function LoginPage({ onLogin }) {
 
   return (
     <div className="relative min-h-screen overflow-hidden flex items-center justify-center px-4 py-8">
-      {/* ================================
-          LANGUAGE
-      ================================= */}
-
       <div className="absolute top-5 right-5 z-30">
         <div className="relative">
           <Globe
@@ -293,10 +267,6 @@ export default function LoginPage({ onLogin }) {
         </div>
       </div>
 
-      {/* ================================
-          BACKGROUND
-      ================================= */}
-
       <div
         className="absolute inset-0 bg-cover bg-center"
         style={{
@@ -308,13 +278,7 @@ export default function LoginPage({ onLogin }) {
       <div className="absolute inset-0 bg-black/25" />
       <div className="absolute inset-0 bg-primary-950/15" />
 
-      {/* ================================
-          MAIN
-      ================================= */}
-
       <div className="relative z-10 w-full max-w-md">
-        {/* BRAND */}
-
         <div className="text-center text-white mb-6">
           <div className="mx-auto h-16 w-16 rounded-2xl bg-white/95 flex items-center justify-center shadow-xl mb-4">
             <img
@@ -324,12 +288,12 @@ export default function LoginPage({ onLogin }) {
             />
           </div>
 
-          <h1 className="text-3xl font-bold tracking-tight">{t("app_name")}</h1>
+          <h1 className="text-3xl font-bold tracking-tight">
+            {t("app_name")}
+          </h1>
 
           <p className="text-white/85 mt-1">{t("tagline")}</p>
         </div>
-
-        {/* LOGIN CARD */}
 
         <div className="bg-white/75 backdrop-blur-xl border border-white/60 rounded-3xl shadow-2xl p-5 sm:p-7">
           {!otpSent ? (
@@ -343,8 +307,6 @@ export default function LoginPage({ onLogin }) {
                   {t("phone_number")}
                 </p>
               </div>
-
-              {/* PHONE */}
 
               <div>
                 <label className="block text-sm font-semibold text-gray-800 mb-2">
@@ -361,7 +323,9 @@ export default function LoginPage({ onLogin }) {
                     inputMode="numeric"
                     value={phone}
                     onChange={(e) =>
-                      setPhone(e.target.value.replace(/\D/g, "").slice(0, 10))
+                      setPhone(
+                        e.target.value.replace(/\D/g, "").slice(0, 10)
+                      )
                     }
                     placeholder={t("enter_phone")}
                     className="flex-1 h-12 px-4 rounded-xl border border-gray-200 bg-white/80 outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100"
@@ -369,8 +333,6 @@ export default function LoginPage({ onLogin }) {
                   />
                 </div>
               </div>
-
-              {/* PASSWORD */}
 
               <div className="mt-4">
                 <label className="block text-sm font-semibold text-gray-800 mb-2">
@@ -396,12 +358,14 @@ export default function LoginPage({ onLogin }) {
                     onClick={() => setShowPassword(!showPassword)}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
                   >
-                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    {showPassword ? (
+                      <EyeOff size={18} />
+                    ) : (
+                      <Eye size={18} />
+                    )}
                   </button>
                 </div>
               </div>
-
-              {/* LOGIN */}
 
               <button
                 type="button"
@@ -413,8 +377,6 @@ export default function LoginPage({ onLogin }) {
                 <ArrowRight size={19} />
               </button>
 
-              {/* FORGOT PASSWORD */}
-
               <button
                 type="button"
                 onClick={handleSendOtp}
@@ -422,8 +384,6 @@ export default function LoginPage({ onLogin }) {
               >
                 Forgot Password?
               </button>
-
-              {/* VOICE */}
 
               <button
                 type="button"
@@ -465,11 +425,9 @@ export default function LoginPage({ onLogin }) {
                     value={otp[i] || ""}
                     onChange={(e) => {
                       const val = e.target.value.replace(/\D/g, "");
-
                       const newOtp = otp.split("");
 
                       newOtp[i] = val;
-
                       setOtp(newOtp.join(""));
 
                       if (val && i < 3) {
@@ -480,8 +438,6 @@ export default function LoginPage({ onLogin }) {
                   />
                 ))}
               </div>
-
-              {/* NEW PASSWORD */}
 
               <div className="mb-4">
                 <label className="block text-sm font-semibold text-gray-800 mb-2">
@@ -504,10 +460,16 @@ export default function LoginPage({ onLogin }) {
 
                   <button
                     type="button"
-                    onClick={() => setShowNewPassword(!showNewPassword)}
+                    onClick={() =>
+                      setShowNewPassword(!showNewPassword)
+                    }
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
                   >
-                    {showNewPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    {showNewPassword ? (
+                      <EyeOff size={18} />
+                    ) : (
+                      <Eye size={18} />
+                    )}
                   </button>
                 </div>
               </div>

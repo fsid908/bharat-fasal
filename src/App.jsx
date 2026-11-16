@@ -43,6 +43,8 @@ import DisputePage from "./pages/DisputePage";
 import SettingsPage from "./pages/SettingsPage";
 import LotDetailsPage from "./pages/LotDetailsPage";
 
+
+const API = (import.meta.env.VITE_API_URL || "http://localhost:5000").replace(/\/$/, "");
 function App() {
   const { i18n } = useTranslation();
   const navigate = useNavigate();
@@ -88,7 +90,7 @@ function App() {
 
       try {
   const response = await fetch(
-    "https://bharat-fasal.onrender.com/api/auth/me",
+    `${API}/api/auth/me`,
     {
       method: "GET",
       headers: {
