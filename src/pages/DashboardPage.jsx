@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 
@@ -19,459 +19,367 @@ import MarketTicker from "../components/MarketTicker";
 import StatCard from "../components/StatCard";
 import PriceCard from "../components/PriceCard";
 
-import { priceAlerts } from "../data/mockPrices";
 import { getGreeting, formatCurrency } from "../utils/formatters";
 
-// =====================================================
-// DEMO ACTIVE LOTS
-// =====================================================
-
-const activeLots = [
-  {
-    id: "BF-LT-1024",
-    crop: "Wheat",
-    quantity: "500 Quintals",
-    grade: "Grade A",
-    price: 2450,
-    location: "Gorakhpur, Uttar Pradesh",
-    buyerInterest: "3 buyers interested",
-    status: "Active",
-  },
-  {
-    id: "BF-LT-1025",
-    crop: "Rice",
-    quantity: "300 Quintals",
-    grade: "Premium",
-    price: 3100,
-    location: "Deoria, Uttar Pradesh",
-    buyerInterest: "2 buyers interested",
-    status: "Active",
-  },
-  {
-    id: "BF-LT-1026",
-    crop: "Maize",
-    quantity: "250 Quintals",
-    grade: "Grade A",
-    price: 2200,
-    location: "Kushinagar, Uttar Pradesh",
-    buyerInterest: "1 buyer interested",
-    status: "Active",
-  },
-];
-
-// =====================================================
-// DASHBOARD PAGE
-// =====================================================
-
 export default function DashboardPage({ user }) {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const navigate = useNavigate();
 
   const [topPrices, setTopPrices] = useState([]);
 
-  const previousPricesRef = useRef({});
-
   const currentUser = user;
   const greeting = getGreeting();
-
-  // =====================================================
-  // DASHBOARD TRANSLATIONS
-  // =====================================================
-
-  const currentLang = (i18n.language || "en").split("-")[0];
-
-  const dashboardText = {
-    en: {
-      farmer: "Farmer",
-      heroTitle1: "Your crop deserves",
-      heroTitle2: "the right market.",
-      heroDescription:
-        "Check today's prices, discover better buyers and make a smarter selling decision.",
-      bestPrice: "Today's Best Price",
-      activeLots: "Active Lots",
-      paymentsPending: "Payments Pending",
-      recommendedBuyers: "Recommended Buyers",
-      quickActivities: "Quickly access your farming activities",
-      newLot: "New Lot",
-      findBuyer: "Find Buyer",
-      complaint: "Complaint",
-      trackPayment: "Track Payment",
-      yourActiveLots: "Your Active Lots",
-      monitorLots: "Monitor your currently listed crops",
-      viewAll: "View All",
-      lotId: "Lot ID",
-      buyerInterested: "buyer interested",
-      buyersInterested: "buyers interested",
-      viewLot: "View Lot",
-      latestMandi: "Latest mandi prices from government data",
-      loadingPrices: "Loading latest mandi prices...",
-      latestChanges: "Latest changes in mandi prices",
-      latestUpdates: "Latest updates affecting farmers and markets",
-      governmentPolicy: "Government Policy",
-      marketReform: "Market Reform",
-      storageLogistics: "Storage & Logistics",
-      today: "Today",
-      yesterday: "Yesterday",
-      news1:
-        "Government announces 5% increase in MSP for Kharif 2026-27 season",
-      news2:
-        "APMC reforms: Direct selling to processors now allowed in 12 states",
-      news3: "Cold storage capacity increased by 20% in Maharashtra",
-      sellConfidence: "Sell with greater confidence",
-      trackActivity:
-        "Track orders, payments and buyer activity from one place.",
-      viewPayments: "View Payments",
-      quintals: "Quintals",
-      grade: "Grade",
-      premium: "Premium",
-      active: "Active",
-      wheat: "Wheat",
-      rice: "Rice",
-      maize: "Maize",
-      alert1: "Tomato prices surged 8.5% at Kolar Mandi",
-      alert2: "Onion prices dropped 5.2% at Lasalgaon",
-      alert3: "Soybean crossed MSP at Indore Mandi",
-      alert4: "Wheat prices stable at Karnal Mandi",
-      hours2: "2 hours ago",
-      hours4: "4 hours ago",
-      hours6: "6 hours ago",
-      day1: "1 day ago",
-    },
-    hi: {
-      farmer: "किसान",
-      heroTitle1: "आपकी फसल की हकदार है",
-      heroTitle2: "सही बाज़ार की।",
-      heroDescription:
-        "आज के भाव देखें, बेहतर खरीदार खोजें और समझदारी से बिक्री का निर्णय लें।",
-      bestPrice: "आज का सबसे अच्छा भाव",
-      activeLots: "सक्रिय लॉट्स",
-      paymentsPending: "लंबित भुगतान",
-      recommendedBuyers: "अनुशंसित खरीदार",
-      quickActivities: "अपनी खेती से जुड़ी गतिविधियों तक जल्दी पहुँचें",
-      newLot: "नई लॉट",
-      findBuyer: "खरीदार खोजें",
-      complaint: "शिकायत",
-      trackPayment: "भुगतान ट्रैक करें",
-      yourActiveLots: "आपकी सक्रिय लॉट्स",
-      monitorLots: "अपनी वर्तमान में सूचीबद्ध फसलों पर नज़र रखें",
-      viewAll: "सभी देखें",
-      lotId: "लॉट आईडी",
-      buyerInterested: "खरीदार रुचि रखता है",
-      buyersInterested: "खरीदार रुचि रखते हैं",
-      viewLot: "लॉट देखें",
-      latestMandi: "सरकारी डेटा से नवीनतम मंडी भाव",
-      loadingPrices: "नवीनतम मंडी भाव लोड हो रहे हैं...",
-      latestChanges: "मंडी भाव में नवीनतम बदलाव",
-      latestUpdates: "किसानों और बाजारों को प्रभावित करने वाले नवीनतम अपडेट",
-      governmentPolicy: "सरकारी नीति",
-      marketReform: "बाजार सुधार",
-      storageLogistics: "भंडारण और लॉजिस्टिक्स",
-      today: "आज",
-      yesterday: "कल",
-      news1:
-        "सरकार ने खरीफ 2026-27 सीजन के लिए MSP में 5% बढ़ोतरी की घोषणा की",
-      news2:
-        "APMC सुधार: 12 राज्यों में प्रोसेसर को सीधे बिक्री की अनुमति",
-      news3: "महाराष्ट्र में कोल्ड स्टोरेज क्षमता में 20% की बढ़ोतरी",
-      sellConfidence: "अधिक भरोसे के साथ बेचें",
-      trackActivity:
-        "एक ही जगह से ऑर्डर, भुगतान और खरीदार की गतिविधि ट्रैक करें।",
-      viewPayments: "भुगतान देखें",
-      quintals: "क्विंटल",
-      grade: "ग्रेड",
-      premium: "प्रीमियम",
-      active: "सक्रिय",
-      wheat: "गेहूं",
-      rice: "चावल",
-      maize: "मक्का",
-      alert1: "कोलार मंडी में टमाटर के भाव 8.5% बढ़े",
-      alert2: "लासलगांव में प्याज के भाव 5.2% गिरे",
-      alert3: "इंदौर मंडी में सोयाबीन का भाव MSP से ऊपर पहुंचा",
-      alert4: "करनाल मंडी में गेहूं के भाव स्थिर",
-      hours2: "2 घंटे पहले",
-      hours4: "4 घंटे पहले",
-      hours6: "6 घंटे पहले",
-      day1: "1 दिन पहले",
-    },
-    ur: {
-      farmer: "کسان",
-      heroTitle1: "آپ کی فصل کی مستحق ہے",
-      heroTitle2: "صحیح بازار کی۔",
-      heroDescription:
-        "آج کی قیمتیں دیکھیں، بہتر خریدار تلاش کریں اور سمجھداری سے فروخت کا فیصلہ کریں۔",
-      bestPrice: "آج کی بہترین قیمت",
-      activeLots: "فعال لاٹس",
-      paymentsPending: "زیر التوا ادائیگیاں",
-      recommendedBuyers: "تجویز کردہ خریدار",
-      quickActivities: "اپنی زرعی سرگرمیوں تک فوری رسائی حاصل کریں",
-      newLot: "نئی لاٹ",
-      findBuyer: "خریدار تلاش کریں",
-      complaint: "شکایت",
-      trackPayment: "ادائیگی ٹریک کریں",
-      yourActiveLots: "آپ کی فعال لاٹس",
-      monitorLots: "اپنی موجودہ درج فصلوں پر نظر رکھیں",
-      viewAll: "سب دیکھیں",
-      lotId: "لاٹ آئی ڈی",
-      buyerInterested: "خریدار دلچسپی رکھتا ہے",
-      buyersInterested: "خریدار دلچسپی رکھتے ہیں",
-      viewLot: "لاٹ دیکھیں",
-      latestMandi: "سرکاری ڈیٹا سے تازہ ترین منڈی قیمتیں",
-      loadingPrices: "تازہ ترین منڈی قیمتیں لوڈ ہو رہی ہیں...",
-      latestChanges: "منڈی قیمتوں میں تازہ ترین تبدیلیاں",
-      latestUpdates: "کسانوں اور بازاروں کو متاثر کرنے والی تازہ ترین معلومات",
-      governmentPolicy: "حکومتی پالیسی",
-      marketReform: "بازار اصلاحات",
-      storageLogistics: "ذخیرہ اور لاجسٹکس",
-      today: "آج",
-      yesterday: "کل",
-      news1:
-        "حکومت نے خریف 2026-27 سیزن کے لیے MSP میں 5 فیصد اضافے کا اعلان کیا",
-      news2:
-        "APMC اصلاحات: 12 ریاستوں میں پروسیسرز کو براہ راست فروخت کی اجازت",
-      news3: "مہاراشٹرا میں کولڈ اسٹوریج کی صلاحیت میں 20 فیصد اضافہ",
-      sellConfidence: "زیادہ اعتماد کے ساتھ فروخت کریں",
-      trackActivity:
-        "ایک ہی جگہ سے آرڈرز، ادائیگیوں اور خریدار کی سرگرمی کو ٹریک کریں۔",
-      viewPayments: "ادائیگیاں دیکھیں",
-      quintals: "کوئنٹل",
-      grade: "گریڈ",
-      premium: "پریمیم",
-      active: "فعال",
-      wheat: "گندم",
-      rice: "چاول",
-      maize: "مکئی",
-      alert1: "کولار منڈی میں ٹماٹر کی قیمتیں 8.5 فیصد بڑھ گئیں",
-      alert2: "لاسالگاؤں میں پیاز کی قیمتیں 5.2 فیصد کم ہوئیں",
-      alert3: "اندور منڈی میں سویا بین کی قیمت MSP سے اوپر پہنچ گئی",
-      alert4: "کرنال منڈی میں گندم کی قیمتیں مستحکم",
-      hours2: "2 گھنٹے پہلے",
-      hours4: "4 گھنٹے پہلے",
-      hours6: "6 گھنٹے پہلے",
-      day1: "1 دن پہلے",
-    },
-    hinglish: {
-      farmer: "Kisan",
-      heroTitle1: "Aapki crop deserve karti hai",
-      heroTitle2: "right market.",
-      heroDescription:
-        "Aaj ke prices check karein, better buyers discover karein aur smarter selling decision lein.",
-      bestPrice: "Aaj ka Best Price",
-      activeLots: "Active Lots",
-      paymentsPending: "Payments Pending",
-      recommendedBuyers: "Recommended Buyers",
-      quickActivities: "Apni farming activities ko quickly access karein",
-      newLot: "New Lot",
-      findBuyer: "Buyer Dhundhein",
-      complaint: "Complaint",
-      trackPayment: "Payment Track Karein",
-      yourActiveLots: "Aapki Active Lots",
-      monitorLots: "Apni listed crops ko monitor karein",
-      viewAll: "Sab Dekhein",
-      lotId: "Lot ID",
-      buyerInterested: "buyer interested",
-      buyersInterested: "buyers interested",
-      viewLot: "Lot Dekhein",
-      latestMandi: "Government data se latest mandi prices",
-      loadingPrices: "Latest mandi prices load ho rahe hain...",
-      latestChanges: "Mandi prices mein latest changes",
-      latestUpdates: "Farmers aur markets ko affect karne wale latest updates",
-      governmentPolicy: "Government Policy",
-      marketReform: "Market Reform",
-      storageLogistics: "Storage & Logistics",
-      today: "Today",
-      yesterday: "Yesterday",
-      news1:
-        "Government ne Kharif 2026-27 season ke MSP mein 5% increase announce kiya",
-      news2:
-        "APMC reforms: 12 states mein processors ko direct selling ki permission",
-      news3: "Maharashtra mein cold storage capacity 20% badhi",
-      sellConfidence: "Zyada confidence ke saath sell karein",
-      trackActivity:
-        "Orders, payments aur buyer activity ko ek hi jagah se track karein.",
-      viewPayments: "Payments Dekhein",
-      quintals: "Quintals",
-      grade: "Grade",
-      premium: "Premium",
-      active: "Active",
-      wheat: "Wheat",
-      rice: "Rice",
-      maize: "Maize",
-      alert1: "Kolar Mandi mein tomato prices 8.5% badhe",
-      alert2: "Lasalgaon mein onion prices 5.2% gire",
-      alert3: "Indore Mandi mein soybean MSP se upar gaya",
-      alert4: "Karnal Mandi mein wheat prices stable hain",
-      hours2: "2 hours pehle",
-      hours4: "4 hours pehle",
-      hours6: "6 hours pehle",
-      day1: "1 din pehle",
-    },
-  };
-
-  const d = dashboardText[currentLang] || dashboardText.en;
-
-  const cropText = {
-    Wheat: d.wheat,
-    Rice: d.rice,
-    Maize: d.maize,
-  };
-
-  const translateQuantity = (value) =>
-    String(value).replace(/Quintals?/i, d.quintals);
-
-  const translateGrade = (value) => {
-    if (value === "Premium") return d.premium;
-    if (value === "Grade A") return `${d.grade} A`;
-    return value;
-  };
-
-  const translatedAlerts = {
-    "Tomato prices surged 8.5% at Kolar Mandi": d.alert1,
-    "Onion prices dropped 5.2% at Lasalgaon": d.alert2,
-    "Soybean crossed MSP at Indore Mandi": d.alert3,
-    "Wheat prices stable at Karnal Mandi": d.alert4,
-  };
-
-  const translatedAlertTimes = {
-    "2 hours ago": d.hours2,
-    "4 hours ago": d.hours4,
-    "6 hours ago": d.hours6,
-    "1 day ago": d.day1,
-  };
-
-  // =====================================================
-  // FETCH MANDI PRICES
-  // =====================================================
+  const [activeLots, setActiveLots] = useState([]);
+  const [purchaseRequests, setPurchaseRequests] = useState([]);
+  const [purchaseRequestsLoading, setPurchaseRequestsLoading] = useState(true);
+  const [requestActionLoading, setRequestActionLoading] = useState(null);
+  const [marketNews, setMarketNews] = useState([]);
 
   useEffect(() => {
-    const fetchMandiPrices = async () => {
+    const API = (
+  import.meta.env.VITE_API_URL || "https://bharat-fasal.onrender.com"
+).replace(/\/$/, "");
+    const userId = currentUser?.id || currentUser?._id || currentUser?.userId;
+
+    if (!userId) {
+      setActiveLots([]);
+      return;
+    }
+
+    let cancelled = false;
+
+    const fetchActiveLots = async () => {
       try {
-        const response = await fetch("https://bharat-fasal.onrender.com/api/mandi-prices");
+        const response = await fetch(`${API}/api/lots`);
 
         if (!response.ok) {
-          throw new Error(`Mandi API error: ${response.status}`);
+          throw new Error(`Lots API error: ${response.status}`);
+        }
+
+        const data = await response.json();
+        const lots = Array.isArray(data) ? data : data?.lots || [];
+
+        const sellerLots = lots
+          .filter(
+            (lot) =>
+              lot.status === "listed" &&
+              String(lot.sellerId) === String(userId),
+          )
+          .map((lot) => ({
+            ...lot,
+            crop: String(lot.commodityId || lot.crop || "Crop")
+              .replace(/[-_]/g, " ")
+              .replace(/\b\w/g, (c) => c.toUpperCase()),
+            price: Number(lot.expectedPrice ?? lot.price ?? 0),
+            location: lot.pickupLocation || "—",
+            quantity: `${lot.quantity || 0} Quintals`,
+            buyerInterest: `${lot.offers?.length || 0} ${
+              lot.offers?.length === 1 ? "buyer" : "buyers"
+            } interested`,
+            status: "Active",
+          }));
+
+        if (!cancelled) {
+          setActiveLots(sellerLots);
+        }
+      } catch (error) {
+        console.error("Active lots fetch error:", error);
+
+        if (!cancelled) {
+          setActiveLots([]);
+        }
+      }
+    };
+
+    fetchActiveLots();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [currentUser?.id, currentUser?._id, currentUser?.userId]);
+
+  useEffect(() => {
+    const API = (
+  import.meta.env.VITE_API_URL || "https://bharat-fasal.onrender.com"
+).replace(/\/$/, "");
+    let cancelled = false;
+
+    const fetchPurchaseRequests = async () => {
+      const token = localStorage.getItem("bf_auth_token");
+
+      if (!token) {
+        if (!cancelled) {
+          setPurchaseRequests([]);
+          setPurchaseRequestsLoading(false);
+        }
+        return;
+      }
+
+      try {
+        setPurchaseRequestsLoading(true);
+
+        const response = await fetch(`${API}/api/purchase-requests/my`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        if (!response.ok) {
+          throw new Error(`Purchase requests API error: ${response.status}`);
         }
 
         const data = await response.json();
 
-        if (!data.records || !Array.isArray(data.records)) {
-          console.warn("No mandi records found");
-          return;
+        if (!cancelled && data.success && Array.isArray(data.requests)) {
+          setPurchaseRequests(data.requests);
+        } else if (!cancelled) {
+          setPurchaseRequests([]);
+        }
+      } catch (error) {
+        console.error("Purchase requests fetch error:", error);
+
+        if (!cancelled) {
+          setPurchaseRequests([]);
+        }
+      } finally {
+        if (!cancelled) {
+          setPurchaseRequestsLoading(false);
+        }
+      }
+    };
+
+    fetchPurchaseRequests();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [currentUser?.id, currentUser?._id, currentUser?.userId]);
+
+  useEffect(() => {
+    const API = (
+  import.meta.env.VITE_API_URL || "https://bharat-fasal.onrender.com"
+).replace(/\/$/, "");
+    let cancelled = false;
+
+    const fetchMarketNews = async () => {
+      try {
+        const response = await fetch(`${API}/api/market-news`);
+
+        if (!response.ok) {
+          throw new Error(`Market news API error: ${response.status}`);
         }
 
+        const data = await response.json();
+
+        if (!cancelled && data.success && Array.isArray(data.news)) {
+          setMarketNews(data.news);
+        }
+      } catch (error) {
+        console.error("Market news fetch error:", error);
+
+        if (!cancelled) {
+          setMarketNews([]);
+        }
+      }
+    };
+
+    fetchMarketNews();
+
+    const interval = setInterval(fetchMarketNews, 15 * 60 * 1000);
+
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, []);
+  useEffect(() => {
+    let cancelled = false;
+
+    const fetchMandiPrices = async () => {
+      try {
+        const API = (
+  import.meta.env.VITE_API_URL || "https://bharat-fasal.onrender.com"
+).replace(/\/$/, "");
+        const response = await fetch(`${API}/api/mandi-prices?limit=20`, {
+          headers: { Accept: "application/json" },
+        });
+        if (!response.ok)
+          throw new Error(`Mandi API error: ${response.status}`);
+
+        const data = await response.json();
+        if (!Array.isArray(data?.records))
+          throw new Error("No mandi records found");
+
         const records = data.records
-          .map((item) => {
-            const commodity = item.commodity || item.Commodity || "";
+          .map((item) => ({
+            ...item,
+            commodity: String(
+              item?.commodity ??
+                item?.Commodity ??
+                item?.crop ??
+                item?.Crop ??
+                "",
+            ).trim(),
+            market: String(
+              item?.market ??
+                item?.Market ??
+                item?.market_name ??
+                item?.Market_Name ??
+                item?.district ??
+                item?.District ??
+                "",
+            ).trim(),
+            state: String(item?.state ?? item?.State ?? "").trim(),
+            min_price: Number(
+              item?.min_price ??
+                item?.Min_Price ??
+                item?.["Min Price"] ??
+                item?.minPrice ??
+                0,
+            ),
+            max_price: Number(
+              item?.max_price ??
+                item?.Max_Price ??
+                item?.["Max Price"] ??
+                item?.maxPrice ??
+                0,
+            ),
+            modal_price: Number(
+              item?.modal_price ??
+                item?.Modal_Price ??
+                item?.["Modal Price"] ??
+                item?.modalPrice ??
+                0,
+            ),
+          }))
+          .filter(
+            (item) => item.commodity && item.market && item.modal_price > 0,
+          );
 
-            const market = item.market || item.Market || "";
+        if (!records.length) throw new Error("No valid mandi prices available");
 
-            const state = item.state || item.State || "";
+        const saved = JSON.parse(
+          localStorage.getItem("bf_mandi_previous_prices") || "{}",
+        );
 
-            const minPrice = Number(item.min_price || item.Min_Price || 0);
-
-            const maxPrice = Number(item.max_price || item.Max_Price || 0);
-
-            const modalPrice = Number(
-              item.modal_price || item.Modal_Price || 0,
-            );
-
-            return {
-              ...item,
-              commodity,
-              market,
-              state,
-              min_price: minPrice,
-              max_price: maxPrice,
-              modal_price: modalPrice,
-            };
-          })
-          .filter((item) => item.commodity && item.modal_price > 0);
-
-        // =================================================
-        // CALCULATE PRICE CHANGE
-        // =================================================
-
-        const updatedRecords = records.map((item) => {
+        const updated = records.map((item) => {
           const key = `${item.commodity}-${item.market}`.toLowerCase();
-
-          const previousPrice = previousPricesRef.current[key];
-
-          let change = 0;
-
-          if (previousPrice && previousPrice > 0) {
-            change = ((item.modal_price - previousPrice) / previousPrice) * 100;
-          }
+          const previous = Number(saved[key]);
+          const change =
+            previous > 0
+              ? ((item.modal_price - previous) / previous) * 100
+              : null;
 
           return {
             ...item,
             change,
+            type:
+              change == null
+                ? "current"
+                : change > 0
+                  ? "up"
+                  : change < 0
+                    ? "down"
+                    : "same",
           };
         });
 
-        // =================================================
-        // SAVE CURRENT PRICES
-        // =================================================
+        localStorage.setItem(
+          "bf_mandi_previous_prices",
+          JSON.stringify(
+            Object.fromEntries(
+              records.map((item) => [
+                `${item.commodity}-${item.market}`.toLowerCase(),
+                item.modal_price,
+              ]),
+            ),
+          ),
+        );
 
-        const currentPrices = {};
-
-        updatedRecords.forEach((item) => {
-          const key = `${item.commodity}-${item.market}`.toLowerCase();
-
-          currentPrices[key] = item.modal_price;
-        });
-
-        previousPricesRef.current = currentPrices;
-
-        // =================================================
-        // SHOW LATEST 6 PRICES
-        // =================================================
-
-        setTopPrices(updatedRecords.slice(0, 6));
+        if (!cancelled) setTopPrices(updated.slice(0, 6));
       } catch (error) {
         console.error("Mandi price fetch error:", error);
       }
     };
 
     fetchMandiPrices();
-
     const interval = setInterval(fetchMandiPrices, 5 * 60 * 1000);
-
     return () => {
+      cancelled = true;
       clearInterval(interval);
     };
   }, []);
 
-  // =====================================================
-  // QUICK ACTIONS
-  // =====================================================
+  const handlePurchaseRequestAction = async (requestId, status) => {
+    const token = localStorage.getItem("bf_auth_token");
+
+    if (!token) {
+      alert("Please login again.");
+      return;
+    }
+
+    try {
+      setRequestActionLoading(requestId);
+
+      const response = await fetch(
+        `${(import.meta.env.VITE_API_URL || "https://bharat-fasal.onrender.com").replace(/\/$/, "")}/api/purchase-requests/${requestId}/status`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ status }),
+        },
+      );
+
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        throw new Error(
+          data.message || `Failed to ${status} purchase request.`,
+        );
+      }
+
+      setPurchaseRequests((prev) =>
+        prev.map((request) =>
+          request.requestId === requestId
+            ? { ...request, status: data.request?.status || status }
+            : request,
+        ),
+      );
+    } catch (error) {
+      console.error("Purchase request action error:", error);
+      alert(error.message || "Unable to update purchase request.");
+    } finally {
+      setRequestActionLoading(null);
+    }
+  };
 
   const quickActions = [
-  {
-    image: "/images/actions/new-lot.jpg",
-    label: d.newLot,
-    path: "/lots",
-  },
-  {
-    image: "/images/actions/find-buyer.jpg",
-    label: d.findBuyer,
-    path: "/buyers",
-  },
-  {
-    image: "/images/actions/customer-complaint.jpg",
-    label: d.complaint,
-    path: "/disputes",
-  },
-  {
-    image: "/images/actions/payment.jpg",
-    label: d.trackPayment,
-    path: "/payments",
-  },
-];
+    {
+      image: "/images/actions/new-lot.jpg",
+      label: "New Lot",
+      path: "/lots",
+    },
+    {
+      image: "/images/actions/find-buyer.jpg",
+      label: "Find Buyer",
+      path: "/buyers",
+    },
+    {
+      image: "/images/actions/customer-complaint.jpg",
+      label: "Complaint",
+      path: "/disputes",
+    },
+    {
+      image: "/images/actions/payment.jpg",
+      label: "Track Payment",
+      path: "/payments",
+    },
+  ];
   return (
     <div className="w-full">
-      {/* =====================================================
-          FARMER DASHBOARD HERO
-          ===================================================== */}
-
       <section
         className="
           relative
@@ -494,8 +402,6 @@ export default function DashboardPage({ user }) {
             lg:min-h-[320px]
           "
         >
-          {/* HERO CONTENT */}
-
           <div
             className="
               flex
@@ -509,7 +415,7 @@ export default function DashboardPage({ user }) {
           >
             <div className="max-w-2xl">
               <p className="text-base sm:text-lg font-semibold text-primary-700">
-                {t(greeting)}, {currentUser?.name || d.farmer}
+                {t(greeting)}, {currentUser?.name || "Farmer"}
               </p>
 
               <div className="flex items-center gap-2 mt-2 text-gray-600">
@@ -518,6 +424,7 @@ export default function DashboardPage({ user }) {
                   strokeWidth={2}
                   className="text-primary-600"
                 />
+
                 <span className="text-sm sm:text-base font-medium">
                   {currentUser?.location || "India"}
                 </span>
@@ -535,9 +442,9 @@ export default function DashboardPage({ user }) {
                   mt-6
                 "
               >
-                {d.heroTitle1}
+                Your crop deserves
                 <br />
-                <span className="text-primary-700">{d.heroTitle2}</span>
+                <span className="text-primary-700">the right market.</span>
               </h2>
 
               <p
@@ -550,14 +457,13 @@ export default function DashboardPage({ user }) {
                   leading-relaxed
                 "
               >
-                {d.heroDescription}
+                Check today's prices, discover better buyers and make a smarter
+                selling decision.
               </p>
             </div>
           </div>
 
-          {/* HERO IMAGE — blended directly into the text area */}
-
-          <div className="relative min-h-[220px] lg:min-h-full overflow-hidden">
+          <div className="relative min-h-[220px] lg:min-h-full">
             <img
               src="/images/hero/farmer-dash.jpg"
               alt="Farmer working in agricultural field"
@@ -568,20 +474,23 @@ export default function DashboardPage({ user }) {
                 h-full
                 object-cover
               "
-              style={{
-                WebkitMaskImage:
-                  "linear-gradient(to right, transparent 0%, rgba(0,0,0,0.08) 8%, rgba(0,0,0,0.28) 20%, rgba(0,0,0,0.58) 34%, rgba(0,0,0,0.82) 48%, #000 62%)",
-                maskImage:
-                  "linear-gradient(to right, transparent 0%, rgba(0,0,0,0.08) 8%, rgba(0,0,0,0.28) 20%, rgba(0,0,0,0.58) 34%, rgba(0,0,0,0.82) 48%, #000 62%)",
-              }}
+            />
+
+            <div
+              className="
+                absolute
+                inset-0
+                bg-gradient-to-r
+                from-primary-50
+                via-transparent
+                to-transparent
+                lg:block
+                hidden
+              "
             />
           </div>
         </div>
       </section>
-
-      {/* =====================================================
-          MAIN DASHBOARD CONTENT
-          ===================================================== */}
 
       <div
         className="
@@ -596,15 +505,7 @@ export default function DashboardPage({ user }) {
           pb-10
         "
       >
-        {/* =====================================================
-            MARKET TICKER
-            ===================================================== */}
-
         <MarketTicker />
-
-        {/* =====================================================
-            STATS
-            ===================================================== */}
 
         <div
           className="
@@ -616,36 +517,38 @@ export default function DashboardPage({ user }) {
         >
           <StatCard
             image="/images/stats/best-price.jpg"
-            label={d.bestPrice}
-            value={formatCurrency(7350)}
+            label="Today's Best Price"
+            value={
+              topPrices.length
+                ? formatCurrency(
+                    Math.max(...topPrices.map((p) => p.modal_price)),
+                  )
+                : "—"
+            }
             color="primary"
           />
 
           <StatCard
             image="/images/stats/active-lots.jpg"
-            label={d.activeLots}
-            value="3"
+            label="Active Lots"
+            value={String(activeLots.length)}
             color="blue"
           />
 
           <StatCard
             image="/images/stats/pending-payment.jpg"
-            label={d.paymentsPending}
-            value={formatCurrency(215000)}
+            label="Payments Pending"
+            value={formatCurrency(0)}
             color="yellow"
           />
 
           <StatCard
             image="/images/stats/nearby-buyer.jpg"
-            label={d.recommendedBuyers}
-            value="8"
+            label="Recommended Buyers"
+            value="0"
             color="primary"
           />
         </div>
-
-        {/* =====================================================
-            QUICK ACTIONS
-            ===================================================== */}
 
         <section>
           <div className="flex items-center justify-between mb-3">
@@ -655,7 +558,7 @@ export default function DashboardPage({ user }) {
               </h3>
 
               <p className="text-sm text-gray-500 mt-0.5">
-                {d.quickActivities}
+                Quickly access your farming activities
               </p>
             </div>
           </div>
@@ -730,10 +633,6 @@ export default function DashboardPage({ user }) {
           </div>
         </section>
 
-        {/* =====================================================
-            YOUR ACTIVE LOTS
-            ===================================================== */}
-
         <section>
           <div
             className="
@@ -745,11 +644,11 @@ export default function DashboardPage({ user }) {
           >
             <div>
               <h3 className="text-lg font-bold text-gray-900">
-                {d.yourActiveLots}
+                Your Active Lots
               </h3>
 
               <p className="text-sm text-gray-500 mt-0.5">
-                {d.monitorLots}
+                Monitor your currently listed crops
               </p>
             </div>
 
@@ -766,16 +665,17 @@ export default function DashboardPage({ user }) {
                 hover:text-primary-700
               "
             >
-              {d.viewAll}
+              View All
               <ArrowRight size={15} />
             </button>
           </div>
 
           <div className="space-y-3">
-            {activeLots.map((lot) => (
-              <div
-                key={lot.id}
-                className="
+            {activeLots.length ? (
+              activeLots.map((lot) => (
+                <div
+                  key={lot.id}
+                  className="
                   bg-white
                   border
                   border-gray-200
@@ -785,9 +685,9 @@ export default function DashboardPage({ user }) {
                   hover:shadow-md
                   transition-shadow
                 "
-              >
-                <div
-                  className="
+                >
+                  <div
+                    className="
                     flex
                     flex-col
                     lg:flex-row
@@ -795,12 +695,10 @@ export default function DashboardPage({ user }) {
                     lg:justify-between
                     gap-4
                   "
-                >
-                  {/* LOT INFO */}
-
-                  <div className="flex items-start gap-3">
-                    <div
-                      className="
+                  >
+                    <div className="flex items-start gap-3">
+                      <div
+                        className="
                         w-11
                         h-11
                         rounded-xl
@@ -812,16 +710,18 @@ export default function DashboardPage({ user }) {
                         justify-center
                         flex-shrink-0
                       "
-                    >
-                      <Package size={21} className="text-green-600" />
-                    </div>
+                      >
+                        <Package size={21} className="text-green-600" />
+                      </div>
 
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <h4 className="font-bold text-gray-900">{cropText[lot.crop] || lot.crop}</h4>
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h4 className="font-bold text-gray-900">
+                            {lot.crop}
+                          </h4>
 
-                        <span
-                          className="
+                          <span
+                            className="
                             px-2
                             py-1
                             rounded-md
@@ -830,17 +730,17 @@ export default function DashboardPage({ user }) {
                             text-[11px]
                             font-semibold
                           "
-                        >
-                          {lot.status === "Active" ? d.active : lot.status}
-                        </span>
-                      </div>
+                          >
+                            {lot.status}
+                          </span>
+                        </div>
 
-                      <p className="text-xs text-gray-500 mt-1">
-                        {d.lotId}: {lot.id}
-                      </p>
+                        <p className="text-xs text-gray-500 mt-1">
+                          Lot ID: {lot.id}
+                        </p>
 
-                      <div
-                        className="
+                        <div
+                          className="
                           flex
                           flex-wrap
                           items-center
@@ -850,23 +750,21 @@ export default function DashboardPage({ user }) {
                           text-sm
                           text-gray-600
                         "
-                      >
-                        <span>{translateQuantity(lot.quantity)}</span>
+                        >
+                          <span>{lot.quantity}</span>
 
-                        <span>{translateGrade(lot.grade)}</span>
+                          <span>{lot.grade}</span>
 
-                        <span>
-                          ₹{lot.price.toLocaleString("en-IN")}
-                          /q
-                        </span>
+                          <span>
+                            ₹{lot.price.toLocaleString("en-IN")}
+                            /q
+                          </span>
+                        </div>
                       </div>
                     </div>
-                  </div>
 
-                  {/* LOT META */}
-
-                  <div
-                    className="
+                    <div
+                      className="
                       flex
                       flex-col
                       sm:flex-row
@@ -875,21 +773,21 @@ export default function DashboardPage({ user }) {
                       lg:min-w-[360px]
                       lg:justify-end
                     "
-                  >
-                    <div
-                      className="
+                    >
+                      <div
+                        className="
                         text-sm
                         text-gray-600
                         sm:text-right
                       "
-                    >
-                      <p className="flex items-center gap-1.5 sm:justify-end">
-                        <MapPin size={14} />
-                        {lot.location}
-                      </p>
+                      >
+                        <p className="flex items-center gap-1.5 sm:justify-end">
+                          <MapPin size={14} />
+                          {lot.location}
+                        </p>
 
-                      <p
-                        className="
+                        <p
+                          className="
                           flex
                           items-center
                           gap-1.5
@@ -898,16 +796,16 @@ export default function DashboardPage({ user }) {
                           font-medium
                           sm:justify-end
                         "
-                      >
-                        <Users size={14} />
-                        {lot.buyerInterest.replace(/buyers interested/i, d.buyersInterested).replace(/buyer interested/i, d.buyerInterested)}
-                      </p>
-                    </div>
+                        >
+                          <Users size={14} />
+                          {lot.buyerInterest}
+                        </p>
+                      </div>
 
-                    <button
-                      type="button"
-                      onClick={() => navigate("/lots")}
-                      className="
+                      <button
+                        type="button"
+                        onClick={() => navigate("/lots")}
+                        className="
                         inline-flex
                         items-center
                         justify-center
@@ -924,20 +822,176 @@ export default function DashboardPage({ user }) {
                         hover:bg-gray-100
                         transition-colors
                       "
-                    >
-                      {d.viewLot}
-                      <ArrowRight size={15} />
-                    </button>
+                      >
+                        View Lot
+                        <ArrowRight size={15} />
+                      </button>
+                    </div>
                   </div>
                 </div>
+              ))
+            ) : (
+              <div className="bg-white border border-gray-200 rounded-2xl p-6 text-center text-sm text-gray-500">
+                No active lots yet. Create a lot to see it here.
               </div>
-            ))}
+            )}
           </div>
         </section>
 
-        {/* =====================================================
-            TOP PRICES
-            ===================================================== */}
+        <section>
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <h3 className="text-lg font-bold text-gray-900">
+                Purchase Requests
+              </h3>
+              <p className="text-sm text-gray-500 mt-0.5">
+                Buyers who have requested to purchase your listed crops
+              </p>
+            </div>
+
+            {purchaseRequests.length > 0 && (
+              <span className="px-2.5 py-1 rounded-full bg-primary-50 text-primary-700 text-xs font-semibold">
+                {purchaseRequests.length} request
+                {purchaseRequests.length === 1 ? "" : "s"}
+              </span>
+            )}
+          </div>
+
+          {purchaseRequestsLoading ? (
+            <div className="bg-white border border-gray-200 rounded-2xl p-6 text-center text-sm text-gray-500">
+              Loading purchase requests...
+            </div>
+          ) : purchaseRequests.length ? (
+            <div className="space-y-3">
+              {purchaseRequests.map((request) => (
+                <div
+                  key={request.requestId || request._id}
+                  className="bg-white border border-gray-200 rounded-2xl shadow-sm p-4 hover:shadow-md transition-shadow"
+                >
+                  <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
+                    <div className="flex items-start gap-3 min-w-0">
+                      <div className="w-11 h-11 rounded-xl bg-primary-50 border border-primary-100 flex items-center justify-center flex-shrink-0">
+                        <Package size={21} className="text-primary-600" />
+                      </div>
+
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h4 className="font-bold text-gray-900 capitalize">
+                            {String(request.commodityId || "Crop").replace(
+                              /[-_]/g,
+                              " ",
+                            )}
+                          </h4>
+
+                          <span
+                            className={`px-2 py-1 rounded-md text-[11px] font-semibold ${
+                              request.status === "pending"
+                                ? "bg-yellow-50 text-yellow-700"
+                                : request.status === "accepted"
+                                  ? "bg-green-50 text-green-700"
+                                  : "bg-red-50 text-red-700"
+                            }`}
+                          >
+                            {request.status}
+                          </span>
+                        </div>
+
+                        <p className="text-xs text-gray-500 mt-1">
+                          Request ID: {request.requestId}
+                        </p>
+
+                        <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-sm">
+                          <div>
+                            <p className="text-xs text-gray-400">Buyer</p>
+                            <p className="mt-1 font-semibold text-gray-900">
+                              {request.buyerName || "Buyer"}
+                            </p>
+                          </div>
+
+                          <div>
+                            <p className="text-xs text-gray-400">Quantity</p>
+                            <p className="mt-1 font-semibold text-gray-900">
+                              {request.quantity} Quintals
+                            </p>
+                          </div>
+
+                          <div>
+                            <p className="text-xs text-gray-400">
+                              Offered Price
+                            </p>
+                            <p className="mt-1 font-semibold text-gray-900">
+                              ₹
+                              {Number(request.offeredPrice || 0).toLocaleString(
+                                "en-IN",
+                              )}
+                              /q
+                            </p>
+                          </div>
+
+                          <div>
+                            <p className="text-xs text-gray-400">
+                              Total Amount
+                            </p>
+                            <p className="mt-1 font-bold text-primary-700">
+                              ₹
+                              {Number(request.totalAmount || 0).toLocaleString(
+                                "en-IN",
+                              )}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row lg:flex-col gap-2 lg:min-w-[130px]">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          handlePurchaseRequestAction(
+                            request.requestId,
+                            "accepted",
+                          )
+                        }
+                        disabled={
+                          request.status !== "pending" ||
+                          requestActionLoading === request.requestId
+                        }
+                        className="inline-flex items-center justify-center px-4 py-2.5 rounded-xl bg-green-600 text-white text-sm font-semibold hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {requestActionLoading === request.requestId
+                          ? "Updating..."
+                          : "Accept"}
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() =>
+                          handlePurchaseRequestAction(
+                            request.requestId,
+                            "rejected",
+                          )
+                        }
+                        disabled={
+                          request.status !== "pending" ||
+                          requestActionLoading === request.requestId
+                        }
+                        className="inline-flex items-center justify-center px-4 py-2.5 rounded-xl border border-gray-200 bg-white text-gray-700 text-sm font-semibold hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {requestActionLoading === request.requestId
+                          ? "Updating..."
+                          : "Reject"}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="bg-white border border-gray-200 rounded-2xl p-6 text-center text-sm text-gray-500">
+              No purchase requests yet. New buyer requests will appear here.
+            </div>
+          )}
+        </section>
 
         <section>
           <div
@@ -954,7 +1008,7 @@ export default function DashboardPage({ user }) {
               </h3>
 
               <p className="text-sm text-gray-500 mt-0.5">
-                {d.latestMandi}
+                Latest mandi prices from government data
               </p>
             </div>
 
@@ -1010,14 +1064,10 @@ export default function DashboardPage({ user }) {
                 text-gray-500
               "
             >
-              {d.loadingPrices}
+              Loading latest mandi prices...
             </div>
           )}
         </section>
-
-        {/* =====================================================
-            PRICE ALERTS
-            ===================================================== */}
 
         <section>
           <div className="mb-3">
@@ -1026,12 +1076,12 @@ export default function DashboardPage({ user }) {
             </h3>
 
             <p className="text-sm text-gray-500 mt-0.5">
-              {d.latestChanges}
+              Latest changes in mandi prices
             </p>
           </div>
 
           <div className="space-y-2">
-            {priceAlerts.map((alert, index) => (
+            {topPrices.slice(0, 4).map((alert, index) => (
               <div
                 key={index}
                 className="
@@ -1065,26 +1115,34 @@ export default function DashboardPage({ user }) {
                     <TrendingUp size={20} className="text-green-600" />
                   ) : alert.type === "down" ? (
                     <TrendingDown size={20} className="text-red-500" />
-                  ) : (
+                  ) : alert.type === "same" ? (
                     <Minus size={20} className="text-gray-500" />
+                  ) : (
+                    <Package size={20} className="text-gray-500" />
                   )}
                 </div>
 
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold text-gray-900">
-                    {translatedAlerts[alert.message] || alert.message}
+                    {alert.change !== null
+                      ? `${alert.commodity} prices ${
+                          alert.change > 0
+                            ? "increased"
+                            : alert.change < 0
+                              ? "decreased"
+                              : "unchanged"
+                        }${alert.change === 0 ? "" : ` ${Math.abs(alert.change).toFixed(1)}%`} at ${alert.market}`
+                      : `${alert.commodity} is currently ₹${alert.modal_price.toLocaleString("en-IN")}/q at ${alert.market}`}
                   </p>
 
-                  <p className="text-xs text-gray-500 mt-0.5">{translatedAlertTimes[alert.time] || alert.time}</p>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    {alert.state || "Latest mandi update"}
+                  </p>
                 </div>
               </div>
             ))}
           </div>
         </section>
-
-        {/* =====================================================
-            MARKET NEWS
-            ===================================================== */}
 
         <section>
           <div className="mb-3">
@@ -1093,119 +1151,54 @@ export default function DashboardPage({ user }) {
             </h3>
 
             <p className="text-sm text-gray-500 mt-0.5">
-              {d.latestUpdates}
+              Latest updates affecting farmers and markets
             </p>
           </div>
 
-          <div
-            className="
-              bg-primary-50
-              border
-              border-primary-200
-              rounded-2xl
-              p-4
-            "
-          >
-            <div className="space-y-3">
-              {/* NEWS 1 */}
-
-              <div className="flex items-start gap-3">
-                <div
-                  className="
-                    w-9
-                    h-9
-                    rounded-lg
-                    bg-white
-                    flex
-                    items-center
-                    justify-center
-                    shrink-0
-                    border
-                    border-primary-100
-                  "
+          <div className="space-y-2">
+            {marketNews.length ? (
+              marketNews.slice(0, 4).map((news) => (
+                <a
+                  key={news.id || news.link}
+                  href={news.link}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block bg-primary-50 border border-primary-200 rounded-2xl p-4 hover:bg-primary-100 transition-colors"
                 >
-                  <Newspaper size={18} className="text-primary-600" />
-                </div>
+                  <div className="flex items-start gap-3">
+                    <div className="w-9 h-9 rounded-lg bg-white border border-primary-100 flex items-center justify-center shrink-0">
+                      <Newspaper size={18} className="text-primary-600" />
+                    </div>
 
-                <div>
-                  <p className="text-sm font-semibold text-gray-900">
-                    {d.news1}
-                  </p>
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-gray-900">
+                        {news.title}
+                      </p>
 
-                  <p className="text-xs text-gray-500 mt-1">
-                    {d.governmentPolicy} • {d.today}
-                  </p>
-                </div>
+                      <p className="text-xs text-gray-500 mt-1">
+                        {news.source || "PIB"} •{" "}
+                        {news.publishedAt
+                          ? new Date(news.publishedAt).toLocaleDateString(
+                              "en-IN",
+                              {
+                                day: "numeric",
+                                month: "short",
+                                year: "numeric",
+                              },
+                            )
+                          : "Latest update"}
+                      </p>
+                    </div>
+                  </div>
+                </a>
+              ))
+            ) : (
+              <div className="bg-primary-50 border border-primary-200 rounded-2xl p-4 text-sm text-gray-600">
+                Latest agriculture news is temporarily unavailable.
               </div>
-
-              {/* NEWS 2 */}
-
-              <div className="flex items-start gap-3">
-                <div
-                  className="
-                    w-9
-                    h-9
-                    rounded-lg
-                    bg-white
-                    flex
-                    items-center
-                    justify-center
-                    shrink-0
-                    border
-                    border-primary-100
-                  "
-                >
-                  <Newspaper size={18} className="text-primary-600" />
-                </div>
-
-                <div>
-                  <p className="text-sm font-semibold text-gray-900">
-                    {d.news2}
-                  </p>
-
-                  <p className="text-xs text-gray-500 mt-1">
-                    {d.marketReform} • {d.today}
-                  </p>
-                </div>
-              </div>
-
-              {/* NEWS 3 */}
-
-              <div className="flex items-start gap-3">
-                <div
-                  className="
-                    w-9
-                    h-9
-                    rounded-lg
-                    bg-white
-                    flex
-                    items-center
-                    justify-center
-                    shrink-0
-                    border
-                    border-primary-100
-                  "
-                >
-                  <Newspaper size={18} className="text-primary-600" />
-                </div>
-
-                <div>
-                  <p className="text-sm font-semibold text-gray-900">
-                    {d.news3}
-                  </p>
-
-                  <p className="text-xs text-gray-500 mt-1">
-                    {d.storageLogistics} • {d.yesterday}
-                  </p>
-                </div>
-              </div>
-            </div>
+            )}
           </div>
         </section>
-
-        {/* =====================================================
-            SELLER TRUST MESSAGE
-            ===================================================== */}
 
         <section
           className="
@@ -1247,11 +1240,11 @@ export default function DashboardPage({ user }) {
 
               <div>
                 <p className="text-sm font-semibold text-gray-900">
-                  {d.sellConfidence}
+                  Sell with greater confidence
                 </p>
 
                 <p className="text-xs text-gray-500 mt-1">
-                  {d.trackActivity}
+                  Track orders, payments and buyer activity from one place.
                 </p>
               </div>
             </div>
@@ -1275,7 +1268,7 @@ export default function DashboardPage({ user }) {
                 transition-colors
               "
             >
-              {d.viewPayments}
+              View Payments
               <ArrowRight size={15} />
             </button>
           </div>

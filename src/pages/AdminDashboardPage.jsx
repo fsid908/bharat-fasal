@@ -30,188 +30,91 @@ export default function AdminDashboardPage({ user }) {
   const [activeTab, setActiveTab] = useState("overview");
   const [search, setSearch] = useState("");
   const [selectedVerification, setSelectedVerification] = useState(null);
+  const [approvalType, setApprovalType] = useState("trader");
 
   // =========================================================
-  // VERIFICATION STORAGE
+  // VERIFICATION DATA
   // =========================================================
 
-  const readVerificationRequests = () => {
-    const possibleKeys = [
-      "bf_verification_requests",
-      "bf_buyer_verifications",
-      "bf_verification_submissions",
-    ];
+  const API = (
+  import.meta.env.VITE_API_URL || "https://bharat-fasal.onrender.com"
+).replace(/\/$/, "");
 
-    const allRequests = [];
-
-    possibleKeys.forEach((key) => {
-      try {
-        const raw = localStorage.getItem(key);
-
-        if (!raw) return;
-
-        const parsed = JSON.parse(raw);
-
-        if (Array.isArray(parsed)) {
-          parsed.forEach((item) => {
-            allRequests.push(item);
-          });
-        } else if (parsed && typeof parsed === "object") {
-          allRequests.push(parsed);
-        }
-      } catch (error) {
-        console.error(`Unable to read ${key}`, error);
-      }
-    });
-
-    // Remove duplicate requests
-    const unique = [];
-
-    allRequests.forEach((item) => {
-      const id =
-        item.id ||
-        item.requestId ||
-        item.userId ||
-        `${item.name}-${item.phone}`;
-
-      const alreadyExists = unique.some(
-        (existing) =>
-          (existing.id ||
-            existing.requestId ||
-            existing.userId ||
-            `${existing.name}-${existing.phone}`) === id,
-      );
-
-      if (!alreadyExists) {
-        unique.push({
-          ...item,
-          id,
-        });
-      }
-    });
-
-    return unique;
+  const getAuthHeaders = () => {
+    const token = localStorage.getItem("bf_auth_token");
+    return {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    };
   };
 
-  const [verificationRequests, setVerificationRequests] = useState(() =>
-    readVerificationRequests(),
-  );
+  const [verificationRequests, setVerificationRequests] = useState([]);
 
-  // =========================================================
-  // REFRESH VERIFICATION DATA
-  // =========================================================
-
-  const refreshVerifications = () => {
-    setVerificationRequests(readVerificationRequests());
+  const refreshVerifications = async () => {
+    try {
+      const response = await fetch(`${API}/api/admin/verifications`, {
+        headers: getAuthHeaders(),
+      });
+      const data = await response.json();
+      if (!response.ok || !data.success) {
+        throw new Error(data.message || "Unable to fetch verifications");
+      }
+      setVerificationRequests(
+        Array.isArray(data.verifications) ? data.verifications : [],
+      );
+    } catch (error) {
+      console.error("Fetch admin verifications error:", error);
+      setVerificationRequests([]);
+    }
   };
 
   useEffect(() => {
     refreshVerifications();
-
-    const handleStorage = () => {
-      refreshVerifications();
-    };
-
-    window.addEventListener("storage", handleStorage);
-
-    const interval = setInterval(() => {
-      refreshVerifications();
-    }, 2000);
-
-    return () => {
-      window.removeEventListener("storage", handleStorage);
-      clearInterval(interval);
-    };
+    const interval = setInterval(refreshVerifications, 30000);
+    return () => clearInterval(interval);
   }, []);
 
   // =========================================================
   // UPDATE VERIFICATION
   // =========================================================
 
-  const updateVerificationStatus = (request, status) => {
-    const requestId =
-      request.id ||
-      request.requestId ||
-      request.userId ||
-      `${request.name}-${request.phone}`;
+  const updateVerificationStatus = async (request, status) => {
+    const verificationId = request?._id || request?.id;
+    if (!verificationId) {
+      window.alert("Verification ID is missing");
+      return;
+    }
 
-    const updatedRequest = {
-      ...request,
-      status,
-      verificationStatus: status,
-      reviewedBy: user?.name || "Admin",
-      reviewedAt: new Date().toISOString(),
-    };
+    try {
+      const endpoint =
+        status === "approved"
+          ? `${API}/api/admin/verifications/${verificationId}/approve`
+          : `${API}/api/admin/verifications/${verificationId}/reject`;
 
-    const possibleKeys = [
-      "bf_verification_requests",
-      "bf_buyer_verifications",
-      "bf_verification_submissions",
-    ];
+      const body =
+        status === "approved"
+          ? { type: approvalType }
+          : { reason: "Rejected by admin" };
 
-    possibleKeys.forEach((key) => {
-      try {
-        const raw = localStorage.getItem(key);
+      const response = await fetch(endpoint, {
+        method: "PATCH",
+        headers: getAuthHeaders(),
+        body: JSON.stringify(body),
+      });
+      const data = await response.json();
 
-        if (!raw) return;
-
-        const parsed = JSON.parse(raw);
-
-        if (Array.isArray(parsed)) {
-          const updated = parsed.map((item) => {
-            const itemId =
-              item.id ||
-              item.requestId ||
-              item.userId ||
-              `${item.name}-${item.phone}`;
-
-            return itemId === requestId
-              ? {
-                  ...item,
-                  status,
-                  verificationStatus: status,
-                  reviewedBy: user?.name || "Admin",
-                  reviewedAt: new Date().toISOString(),
-                }
-              : item;
-          });
-
-          localStorage.setItem(key, JSON.stringify(updated));
-        }
-      } catch (error) {
-        console.error(`Unable to update ${key}`, error);
+      if (!response.ok || !data.success) {
+        throw new Error(data.message || "Unable to update verification");
       }
-    });
 
-    // Store decision separately.
-    localStorage.setItem(
-      `bf_verification_status_${requestId}`,
-      JSON.stringify(updatedRequest),
-    );
-
-    // Broadcast event for same-tab listeners.
-    window.dispatchEvent(
-      new CustomEvent("bf-verification-updated", {
-        detail: updatedRequest,
-      }),
-    );
-
-    setVerificationRequests((prev) =>
-      prev.map((item) => {
-        const itemId =
-          item.id ||
-          item.requestId ||
-          item.userId ||
-          `${item.name}-${item.phone}`;
-
-        return itemId === requestId ? updatedRequest : item;
-      }),
-    );
-
-    setSelectedVerification(null);
+      setSelectedVerification(null);
+      await refreshVerifications();
+    } catch (error) {
+      console.error("Update verification error:", error);
+      window.alert(error.message || "Unable to update verification");
+    }
   };
 
-  // =========================================================
   // HELPERS
   // =========================================================
 
@@ -944,7 +847,10 @@ export default function AdminDashboardPage({ user }) {
                       <button
                         key={item.id}
                         type="button"
-                        onClick={() => setSelectedVerification(item)}
+                        onClick={() => {
+                          setSelectedVerification(item);
+                          setApprovalType("trader");
+                        }}
                         className={`w-full flex items-center gap-3 px-5 py-4 text-left hover:bg-gray-50 transition ${
                           index !== Math.min(pendingVerifications.length, 3) - 1
                             ? "border-b border-gray-100"
@@ -1290,7 +1196,10 @@ export default function AdminDashboardPage({ user }) {
                       <div className="flex items-center gap-2">
                         <button
                           type="button"
-                          onClick={() => setSelectedVerification(item)}
+                          onClick={() => {
+                            setSelectedVerification(item);
+                            setApprovalType("trader");
+                          }}
                           className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg border border-gray-200 text-sm font-semibold text-gray-700 hover:bg-gray-50"
                         >
                           <Eye size={15} />
@@ -1686,6 +1595,22 @@ export default function AdminDashboardPage({ user }) {
                     documents.
                   </p>
 
+                  {selectedVerification.type === "buyer" && (
+                    <div className="mt-4">
+                      <label className="block text-xs font-semibold text-gray-600 mb-1.5">
+                        Marketplace Buyer Type
+                      </label>
+                      <select
+                        value={approvalType}
+                        onChange={(e) => setApprovalType(e.target.value)}
+                        className="w-full h-10 px-3 rounded-lg border border-gray-200 bg-white text-sm outline-none focus:border-gray-400 focus:ring-2 focus:ring-gray-100"
+                      >
+                        <option value="processor">Processor</option>
+                        <option value="trader">Trader</option>
+                        <option value="institutional">Institutional</option>
+                      </select>
+                    </div>
+                  )}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">
                     <button
                       type="button"
@@ -1701,19 +1626,21 @@ export default function AdminDashboardPage({ user }) {
                       Reject Verification
                     </button>
 
-                    <button
-                      type="button"
-                      onClick={() =>
-                        updateVerificationStatus(
-                          selectedVerification,
-                          "approved",
-                        )
-                      }
-                      className="inline-flex items-center justify-center gap-2 py-3 rounded-lg bg-green-600 hover:bg-green-700 text-white text-sm font-semibold"
-                    >
-                      <Check size={17} />
-                      Approve Buyer
-                    </button>
+                    {selectedVerification.type === "buyer" && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          updateVerificationStatus(
+                            selectedVerification,
+                            "approved",
+                          )
+                        }
+                        className="inline-flex items-center justify-center gap-2 py-3 rounded-lg bg-green-600 hover:bg-green-700 text-white text-sm font-semibold"
+                      >
+                        <Check size={17} />
+                        Approve Buyer
+                      </button>
+                    )}
                   </div>
                 </div>
               ) : (

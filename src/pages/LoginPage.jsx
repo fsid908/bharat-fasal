@@ -1,11 +1,6 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
-  Sprout,
-  UserRound,
-  Building2,
-  Handshake,
-  ShieldCheck,
   Volume2,
   ArrowRight,
   Globe,
@@ -21,7 +16,6 @@ export default function LoginPage({ onLogin }) {
   // FORM STATES
   // ================================
 
-  const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -29,11 +23,6 @@ export default function LoginPage({ onLogin }) {
   const [newPassword, setNewPassword] = useState("");
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [otpSent, setOtpSent] = useState(false);
-
-  const [userType, setUserType] = useState("farmer");
-
-  // Buyer / FPO only
-  const [companyName, setCompanyName] = useState("");
 
   const currentLanguage = i18n.language;
 
@@ -52,27 +41,10 @@ export default function LoginPage({ onLogin }) {
   };
 
   // ================================
-  // ROLE CHANGE
-  // ================================
-
-  const handleUserTypeChange = (type) => {
-    setUserType(type);
-
-    // Never carry organization name
-    // from one role to another.
-    setCompanyName("");
-  };
-
-  // ================================
   // PASSWORD LOGIN
   // ================================
 
   const handlePasswordLogin = async () => {
-  if (name.trim().length < 2) {
-    alert("Please enter your name");
-    return;
-  }
-
   if (phone.length !== 10) {
     alert("Please enter a valid 10 digit mobile number");
     return;
@@ -80,18 +52,6 @@ export default function LoginPage({ onLogin }) {
 
   if (password.length < 6) {
     alert("Please enter a valid password");
-    return;
-  }
-
-  if (
-    (userType === "buyer" || userType === "fpo") &&
-    companyName.trim().length < 2
-  ) {
-    alert(
-      userType === "buyer"
-        ? "Please enter your company / organization name"
-        : "Please enter your FPO / organization name"
-    );
     return;
   }
 
@@ -121,10 +81,7 @@ export default function LoginPage({ onLogin }) {
     const user = {
       id: data.user.id,
       name: data.user.name,
-      companyName:
-        userType === "buyer" || userType === "fpo"
-          ? data.user.organizationName || companyName.trim()
-          : "",
+      companyName: data.user.organizationName || "",
       email: data.user.email || "",
       role: data.user.role,
       location: data.user.village || "",
@@ -289,8 +246,8 @@ export default function LoginPage({ onLogin }) {
       : t("login_instruction", {
           defaultValue:
             currentLanguage === "hi"
-              ? "अपना नाम, मोबाइल नंबर और पासवर्ड डालें। फिर लॉगिन करें।"
-              : "Enter your name, mobile number, and password. Then login.",
+              ? "अपना मोबाइल नंबर और पासवर्ड डालें। फिर लॉगिन करें।"
+              : "Enter your mobile number and password. Then login.",
         });
 
     window.speechSynthesis.cancel();
@@ -302,39 +259,6 @@ export default function LoginPage({ onLogin }) {
 
     window.speechSynthesis.speak(speech);
   };
-
-  // ================================
-  // ROLES
-  // ================================
-
-  const roles = [
-    {
-      id: "farmer",
-      icon: UserRound,
-      label: t("farmer"),
-    },
-    {
-      id: "fpo",
-      icon: Building2,
-      label: t("fpo"),
-    },
-    {
-      id: "buyer",
-      icon: Handshake,
-      label: t("buyer_marketplace", {
-        defaultValue: "Buyer",
-      }),
-    },
-    {
-      id: "admin",
-      icon: ShieldCheck,
-      label: t("admin", {
-        defaultValue: "Admin",
-      }),
-    },
-  ];
-
-  const needsOrganizationName = userType === "buyer" || userType === "fpo";
 
   return (
     <div className="relative min-h-screen overflow-hidden flex items-center justify-center px-4 py-8">
@@ -420,74 +344,6 @@ export default function LoginPage({ onLogin }) {
                 </p>
               </div>
 
-              {/* ROLE */}
-
-              <div className="grid grid-cols-2 gap-3 mb-6">
-                {roles.map((role) => {
-                  const Icon = role.icon;
-                  const active = userType === role.id;
-
-                  return (
-                    <button
-                      key={role.id}
-                      type="button"
-                      onClick={() => handleUserTypeChange(role.id)}
-                      className={`min-h-[88px] rounded-xl border-2 flex flex-col items-center justify-center transition-all ${
-                        active
-                          ? "border-primary-600 bg-primary-50 text-primary-700 shadow-md"
-                          : "border-gray-200 bg-white/70 text-gray-600 hover:border-primary-300 hover:bg-primary-50/50"
-                      }`}
-                    >
-                      <Icon size={25} strokeWidth={1.8} className="mb-2" />
-
-                      <span className="font-semibold text-sm">
-                        {role.label}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-
-              {/* NAME */}
-
-              <div className="mb-4">
-                <label className="block text-sm font-semibold text-gray-800 mb-2">
-                  {t("name")}
-                </label>
-
-                <input
-                  type="text"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder={t("name")}
-                  className="w-full h-12 px-4 rounded-xl border border-gray-200 bg-white/80 outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100"
-                />
-              </div>
-
-              {/* COMPANY / FPO */}
-
-              {needsOrganizationName && (
-                <div className="mb-4">
-                  <label className="block text-sm font-semibold text-gray-800 mb-2">
-                    {userType === "buyer"
-                      ? "Company / Organization Name"
-                      : "FPO / Organization Name"}
-                  </label>
-
-                  <input
-                    type="text"
-                    value={companyName}
-                    onChange={(e) => setCompanyName(e.target.value)}
-                    placeholder={
-                      userType === "buyer"
-                        ? "Enter company / organization name"
-                        : "Enter FPO / organization name"
-                    }
-                    className="w-full h-12 px-4 rounded-xl border border-gray-200 bg-white/80 outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100"
-                  />
-                </div>
-              )}
-
               {/* PHONE */}
 
               <div>
@@ -550,12 +406,7 @@ export default function LoginPage({ onLogin }) {
               <button
                 type="button"
                 onClick={handlePasswordLogin}
-                disabled={
-                  name.trim().length < 2 ||
-                  phone.length !== 10 ||
-                  password.length < 6 ||
-                  (needsOrganizationName && companyName.trim().length < 2)
-                }
+                disabled={phone.length !== 10 || password.length < 6}
                 className="w-full mt-5 h-12 rounded-xl bg-primary-600 hover:bg-primary-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-semibold flex items-center justify-center gap-2 transition-colors"
               >
                 {t("login")}
@@ -602,22 +453,6 @@ export default function LoginPage({ onLogin }) {
                     : `OTP sent to +91 ${phone}`}
                 </p>
               </div>
-
-              {/* DEMO OTP */}
-
-              {/* <div className="bg-primary-50 border border-primary-100 rounded-xl p-3 mb-5 text-center"> */}
-
-              {/* <p className="text-xs text-primary-600">
-                  Demo OTP
-                </p>
-
-                <p className="text-xl font-bold tracking-[0.35em] text-primary-800">
-                  1234
-                </p> */}
-
-              {/* </div> */}
-
-              {/* OTP */}
 
               <div className="flex justify-center gap-2 mb-5">
                 {[0, 1, 2, 3].map((i) => (

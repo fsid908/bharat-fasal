@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ShieldCheck,
   Package,
@@ -13,82 +13,194 @@ import {
   ArrowRight,
 } from "lucide-react";
 
-const procurementOrders = [
-  {
-    orderId: "BF-ORD-1024",
-    lotId: "BF-LOT-10452",
-    crop: "Wheat",
-    quantity: 500,
-    grade: "Grade A",
-    seller: "Shiv Farmers FPO",
-    location: "Gorakhpur, Uttar Pradesh",
-    produceCost: 1250000,
-    transportCost: 18000,
-    paymentStatus: "Protected",
-    qualityStatus: "Verified",
-    quantityStatus: "Verified",
-    transport: "Buyer arranged",
-    deliveryStatus: "In Transit",
-    orderDate: "25 Aug 2026",
-    expectedDelivery: "5 Sep 2026",
-  },
-  {
-    orderId: "BF-ORD-1021",
-    lotId: "BF-LOT-10431",
-    crop: "Rice",
-    quantity: 300,
-    grade: "Grade A",
-    seller: "Eastern Grain FPO",
-    location: "Karnal, Haryana",
-    produceCost: 870000,
-    transportCost: 22000,
-    paymentStatus: "Protected",
-    qualityStatus: "Verified",
-    quantityStatus: "Verified",
-    transport: "Seller arranged",
-    deliveryStatus: "In Transit",
-    orderDate: "22 Aug 2026",
-    expectedDelivery: "4 Sep 2026",
-  },
-  {
-    orderId: "BF-ORD-1018",
-    lotId: "BF-LOT-10408",
-    crop: "Tomato",
-    quantity: 120,
-    grade: "Grade A",
-    seller: "Fresh Harvest FPO",
-    location: "Nashik, Maharashtra",
-    produceCost: 312000,
-    transportCost: 12000,
-    paymentStatus: "Released",
-    qualityStatus: "Verified",
-    quantityStatus: "Verified",
-    transport: "Buyer arranged",
-    deliveryStatus: "Delivered",
-    orderDate: "15 Aug 2026",
-    expectedDelivery: "20 Aug 2026",
-  },
-  {
-    orderId: "BF-ORD-1012",
-    lotId: "BF-LOT-10392",
-    crop: "Soybean",
-    quantity: 200,
-    grade: "Grade A",
-    seller: "Malwa Agro FPO",
-    location: "Indore, Madhya Pradesh",
-    produceCost: 1040000,
-    transportCost: 16000,
-    paymentStatus: "Released",
-    qualityStatus: "Verified",
-    quantityStatus: "Verified",
-    transport: "Seller arranged",
-    deliveryStatus: "Delivered",
-    orderDate: "10 Aug 2026",
-    expectedDelivery: "16 Aug 2026",
-  },
-];
+const formatDeliveryDate = (date) => {
+  if (!date) return "Not available";
+
+  const parsedDate = new Date(date);
+
+  if (Number.isNaN(parsedDate.getTime())) {
+    return "Not available";
+  }
+
+  return parsedDate.toLocaleDateString("en-IN", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    timeZone: "UTC",
+  });
+};
 
 export default function PaymentsPage({ user }) {
+  const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
+
+  const [procurementOrders, setProcurementOrders] = useState([]);
+  const [ordersLoading, setOrdersLoading] = useState(true);
+  const [ordersError, setOrdersError] = useState("");
+  const [verificationLoading, setVerificationLoading] = useState({});
+  const [verificationError, setVerificationError] = useState("");
+
+  useEffect(() => {
+    const token = localStorage.getItem("bf_auth_token");
+
+    if (!token) {
+      setProcurementOrders([]);
+      setOrdersError("Please log in to view your orders.");
+      setOrdersLoading(false);
+      return;
+    }
+
+    const fetchOrders = async () => {
+      try {
+        setOrdersLoading(true);
+        setOrdersError("");
+
+        const response = await fetch(`${API}/api/orders/my`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        const data = await response.json();
+
+        if (!response.ok || !data.success) {
+          throw new Error(data.message || "Failed to load orders.");
+        }
+
+        const orders = Array.isArray(data.orders) ? data.orders : [];
+
+        setProcurementOrders(
+          orders.map((order) => {
+            const payment = String(
+              order.paymentStatus || "pending",
+            ).toLowerCase();
+            const quality = String(order.qualityStatus || "").toLowerCase();
+            const quantity = String(order.quantityStatus || "").toLowerCase();
+            const delivery = String(
+              order.logisticsStatus || order.status || "",
+            ).toLowerCase();
+
+            const eligible =
+              quality === "approved" &&
+              quantity === "approved" &&
+              delivery === "delivered";
+
+            return {
+              ...order,
+              crop: order.commodityId || "Crop",
+              seller: order.sellerName || "Seller",
+              produceCost: Number(order.totalAmount || 0),
+
+              paymentStatus: (() => {
+                const payment = String(
+                  order.paymentStatus || "pending",
+                ).toLowerCase();
+                const quality = String(order.qualityStatus || "").toLowerCase();
+                const quantity = String(
+                  order.quantityStatus || "",
+                ).toLowerCase();
+                const delivery = String(
+                  order.logisticsStatus || order.status || "",
+                ).toLowerCase();
+
+                const verificationRejected =
+                  quality === "rejected" || quantity === "rejected";
+
+                const reviewComplete =
+                  ["approved", "verified"].includes(quality) &&
+                  ["approved", "verified"].includes(quantity) &&
+                  delivery === "delivered";
+
+                if (verificationRejected) return "Review Required";
+
+                if (["paid", "released"].includes(payment)) {
+                  return reviewComplete ? "Released" : "Review Required";
+                }
+
+                if (["pending", "protected"].includes(payment)) {
+                  return "Protected";
+                }
+
+                return order.paymentStatus || "Pending";
+              })(),
+
+              qualityStatus:
+                quality === "approved"
+                  ? "Verified"
+                  : quality === "rejected"
+                    ? "Rejected"
+                    : "Not verified",
+
+              quantityStatus:
+                quantity === "approved"
+                  ? "Verified"
+                  : quantity === "rejected"
+                    ? "Rejected"
+                    : "Not verified",
+
+              location: order.location || "—",
+              transport:
+                order.transport || "Transportation details unavailable",
+              transportCost: Number(order.transportCost || 0),
+              deliveryStatus: (() => {
+                const status = String(
+                  order.logisticsStatus || order.status || "Pending",
+                ).toLowerCase();
+
+                return status === "delivered"
+                  ? "Delivered"
+                  : status === "in transit"
+                    ? "In Transit"
+                    : status.charAt(0).toUpperCase() + status.slice(1);
+              })(),
+              grade: order.grade || "—",
+              expectedDelivery: order.expectedDelivery || "Not available",
+            };
+          }),
+        );
+      } catch (error) {
+        console.error("Payments page orders error:", error);
+        setOrdersError(error.message || "Could not load orders.");
+        setProcurementOrders([]);
+      } finally {
+        setOrdersLoading(false);
+      }
+    };
+
+    fetchOrders();
+
+    const fetchMyQuestions = async () => {
+      const token = localStorage.getItem("bf_auth_token");
+
+      if (!token) return;
+
+      try {
+        setQuestionsLoading(true);
+        setQuestionsError("");
+
+        const response = await fetch(`${API}/api/grievances/my`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        const data = await response.json();
+
+        if (!response.ok || !data.success) {
+          throw new Error(data.message || "Failed to load questions.");
+        }
+
+        setMyQuestions(Array.isArray(data.grievances) ? data.grievances : []);
+      } catch (error) {
+        console.error("Fetch questions error:", error);
+        setQuestionsError(error.message || "Could not load questions.");
+      } finally {
+        setQuestionsLoading(false);
+      }
+    };
+
+    fetchMyQuestions();
+  }, [API]);
+
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [showQuestionModal, setShowQuestionModal] = useState(false);
   const [questionOrder, setQuestionOrder] = useState(null);
@@ -104,16 +216,90 @@ export default function PaymentsPage({ user }) {
     return order.produceCost + order.transportCost;
   };
 
+  const updateVerification = async (order, field, status) => {
+    const loadingKey = `${order.orderId}-${field}`;
+    const token = localStorage.getItem("bf_auth_token");
+
+    setVerificationLoading((prev) => ({
+      ...prev,
+      [loadingKey]: true,
+    }));
+
+    setVerificationError("");
+
+    try {
+      const response = await fetch(
+        `${API}/api/orders/${encodeURIComponent(order.orderId)}/verification`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ field, status }),
+        },
+      );
+
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.message || "Verification update failed.");
+      }
+
+      const updatedOrder = {
+        ...order,
+        ...data.order,
+      };
+
+      if (
+        updatedOrder.qualityStatus === "Rejected" ||
+        updatedOrder.quantityStatus === "Rejected"
+      ) {
+        updatedOrder.paymentStatus = "Review Required";
+      } else if (
+        updatedOrder.qualityStatus !== "Verified" ||
+        updatedOrder.quantityStatus !== "Verified"
+      ) {
+        updatedOrder.paymentStatus = "Protected";
+      }
+      setProcurementOrders((prev) =>
+        prev.map((item) =>
+          item.orderId === order.orderId ? { ...item, ...updatedOrder } : item,
+        ),
+      );
+
+      setSelectedOrder((prev) =>
+        prev?.orderId === order.orderId ? { ...prev, ...updatedOrder } : prev,
+      );
+    } catch (error) {
+      console.error("Verification error:", error);
+      setVerificationError(error.message || "Unable to update verification.");
+    } finally {
+      setVerificationLoading((prev) => ({
+        ...prev,
+        [loadingKey]: false,
+      }));
+    }
+  };
   const totalPaymentHeld = procurementOrders
-    .filter((order) => order.paymentStatus === "Protected")
-    .reduce((total, order) => total + order.produceCost, 0);
+    .filter((order) =>
+      ["pending", "protected"].includes(
+        String(order.paymentStatus || "").toLowerCase(),
+      ),
+    )
+    .reduce((total, order) => total + Number(order.produceCost || 0), 0);
 
   const totalPaymentReleased = procurementOrders
-    .filter((order) => order.paymentStatus === "Released")
-    .reduce((total, order) => total + order.produceCost, 0);
+    .filter((order) =>
+      ["released"].includes(String(order.paymentStatus || "").toLowerCase()),
+    )
+    .reduce((total, order) => total + Number(order.produceCost || 0), 0);
 
   const activeOrders = procurementOrders.filter(
-    (order) => order.deliveryStatus !== "Delivered"
+    (order) =>
+      !["delivered", "cancelled", "completed"].includes(
+        String(order.deliveryStatus || "").toLowerCase(),
+      ),
   ).length;
 
   const openQuestionModal = (order) => {
@@ -131,19 +317,85 @@ export default function PaymentsPage({ user }) {
     setQuestionSent(false);
   };
 
-  const submitQuestion = () => {
-    if (!questionText.trim()) return;
+  const [questionSubmitting, setQuestionSubmitting] = useState(false);
+  const [questionError, setQuestionError] = useState("");
+
+  const [myQuestions, setMyQuestions] = useState([]);
+  const [questionsLoading, setQuestionsLoading] = useState(false);
+  const [questionsError, setQuestionsError] = useState("");
+
+const submitQuestion = async () => {
+  if (!questionText.trim() || !questionOrder?.orderId) {
+    setQuestionError("Please enter your question and select an order.");
+    return;
+  }
+
+  const token = localStorage.getItem("bf_auth_token");
+
+  if (!token) {
+    setQuestionError("Please log in again to submit your question.");
+    return;
+  }
+
+  try {
+    setQuestionSubmitting(true);
+    setQuestionError("");
+
+    const response = await fetch(`${API}/api/grievances`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        orderId: questionOrder.orderId,
+        questionType,
+        questionText: questionText.trim(),
+      }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok || !data.success) {
+      throw new Error(data.message || "Unable to submit your question.");
+    }
+
+    // Refresh My Questions from the backend after successful submission.
+    const questionsResponse = await fetch(`${API}/api/grievances/my`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    const questionsData = await questionsResponse.json();
+
+    if (!questionsResponse.ok || !questionsData.success) {
+      throw new Error(
+        questionsData.message || "Question submitted, but the list could not be refreshed."
+      );
+    }
+
+    setMyQuestions(
+      Array.isArray(questionsData.grievances)
+        ? questionsData.grievances
+        : []
+    );
+
     setQuestionSent(true);
-  };
+  } catch (error) {
+    console.error("Submit question error:", error);
+    setQuestionError(error.message || "Something went wrong.");
+  } finally {
+    setQuestionSubmitting(false);
+  }
+};
 
   return (
     <div className="w-full max-w-[1500px] mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-10">
-
       {/* =====================================================
           PAGE HEADER
       ====================================================== */}
       <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4 mb-7">
-
         <div>
           <p className="text-xs font-semibold uppercase tracking-wide text-green-700 mb-1">
             Buyer Procurement
@@ -168,7 +420,6 @@ export default function PaymentsPage({ user }) {
           SUMMARY CARDS
       ====================================================== */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-7">
-
         <SummaryCard
           icon={<Package size={20} />}
           iconClass="bg-blue-50 text-blue-600"
@@ -198,11 +449,8 @@ export default function PaymentsPage({ user }) {
           PROTECTED PAYMENT BANNER
       ====================================================== */}
       <div className="bg-white border border-green-200 rounded-2xl p-5 mb-8 shadow-sm">
-
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-5">
-
           <div className="flex items-start gap-3">
-
             <div className="h-11 w-11 shrink-0 rounded-xl bg-green-50 border border-green-100 flex items-center justify-center text-green-600">
               <ShieldCheck size={22} />
             </div>
@@ -213,9 +461,9 @@ export default function PaymentsPage({ user }) {
               </h2>
 
               <p className="text-xs sm:text-sm text-gray-500 mt-1 max-w-3xl leading-5">
-                Payment remains protected until delivery and successful
-                quantity and quality verification. Once the procurement
-                conditions are satisfied, the payment can be released.
+                Payment remains protected until delivery and successful quantity
+                and quality verification. Once the procurement conditions are
+                satisfied, the payment can be released.
               </p>
             </div>
           </div>
@@ -231,7 +479,6 @@ export default function PaymentsPage({ user }) {
           PROCUREMENT ORDERS HEADER
       ====================================================== */}
       <div className="flex items-end justify-between mb-4">
-
         <div>
           <h2 className="text-lg font-bold text-gray-900">
             Procurement Orders
@@ -251,14 +498,11 @@ export default function PaymentsPage({ user }) {
           ORDER CARDS
       ====================================================== */}
       <div className="space-y-5">
-
         {procurementOrders.map((order) => {
-
           const landedCost = getLandedCost(order);
           const landedPerQuintal = landedCost / order.quantity;
 
-          const isDelivered =
-            order.deliveryStatus === "Delivered";
+          const isDelivered = order.deliveryStatus === "Delivered";
 
           return (
             <div
@@ -272,24 +516,18 @@ export default function PaymentsPage({ user }) {
                 shadow-sm
               "
             >
-
               {/* =================================================
                   ORDER HEADER
               ================================================== */}
               <div className="px-5 py-4 bg-gray-50/80 border-b border-gray-200">
-
                 <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-
                   <div className="flex items-start gap-3">
-
                     <div className="h-11 w-11 shrink-0 rounded-xl bg-white border border-gray-200 flex items-center justify-center text-green-700">
                       <Package size={21} />
                     </div>
 
                     <div>
-
                       <div className="flex flex-wrap items-center gap-2">
-
                         <h3 className="text-base sm:text-lg font-bold text-gray-900">
                           {order.crop}
                         </h3>
@@ -310,26 +548,24 @@ export default function PaymentsPage({ user }) {
                         >
                           {order.paymentStatus === "Protected"
                             ? "Payment Protected"
-                            : "Payment Released"}
+                            : order.paymentStatus === "Review Required"
+                              ? "Review Required"
+                              : order.paymentStatus === "Released"
+                                ? "Payment Released"
+                                : `Payment ${order.paymentStatus}`}
                         </span>
                       </div>
 
                       <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1.5 text-xs text-gray-500">
+                        <span>Order ID: {order.orderId}</span>
 
-                        <span>
-                          Order ID: {order.orderId}
-                        </span>
-
-                        <span>
-                          Lot ID: {order.lotId}
-                        </span>
+                        <span>Lot ID: {order.lotId}</span>
                       </div>
                     </div>
                   </div>
 
                   {/* LANDED COST */}
                   <div className="lg:text-right bg-white border border-gray-200 rounded-xl px-4 py-3">
-
                     <p className="text-[11px] font-medium text-gray-500">
                       Estimated Landed Cost
                     </p>
@@ -349,21 +585,15 @@ export default function PaymentsPage({ user }) {
                   ORDER DETAILS
               ================================================== */}
               <div className="p-5">
-
                 {/* BASIC INFO */}
                 <div className="flex flex-wrap gap-x-6 gap-y-2 text-xs sm:text-sm text-gray-600 mb-5">
-
                   <span>
-                    <strong className="text-gray-800">
-                      {order.quantity}
-                    </strong>{" "}
+                    <strong className="text-gray-800">{order.quantity}</strong>{" "}
                     Quintals
                   </span>
 
                   <span>
-                    <strong className="text-gray-800">
-                      {order.grade}
-                    </strong>
+                    <strong className="text-gray-800">{order.grade}</strong>
                   </span>
 
                   <span className="flex items-center gap-1.5">
@@ -373,9 +603,7 @@ export default function PaymentsPage({ user }) {
 
                   <span>
                     Seller:{" "}
-                    <strong className="text-gray-800">
-                      {order.seller}
-                    </strong>
+                    <strong className="text-gray-800">{order.seller}</strong>
                   </span>
                 </div>
 
@@ -383,7 +611,6 @@ export default function PaymentsPage({ user }) {
                     COST SECTION
                 ================================================== */}
                 <div className="rounded-xl border border-gray-200 overflow-hidden mb-5">
-
                   <div className="px-4 py-3 bg-gray-50 border-b border-gray-200">
                     <p className="text-xs font-bold uppercase tracking-wide text-gray-600">
                       Procurement Cost
@@ -391,13 +618,9 @@ export default function PaymentsPage({ user }) {
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-gray-200">
-
                     {/* PRODUCE */}
                     <div className="p-4">
-
-                      <p className="text-xs text-gray-500">
-                        Produce Cost
-                      </p>
+                      <p className="text-xs text-gray-500">Produce Cost</p>
 
                       <p className="text-base font-bold text-gray-900 mt-1">
                         {formatCurrency(order.produceCost)}
@@ -410,7 +633,6 @@ export default function PaymentsPage({ user }) {
 
                     {/* TRANSPORT */}
                     <div className="p-4">
-
                       <p className="text-xs text-gray-500">
                         Estimated Transportation
                       </p>
@@ -427,7 +649,6 @@ export default function PaymentsPage({ user }) {
 
                     {/* LANDED */}
                     <div className="p-4 bg-green-50/60">
-
                       <p className="text-xs text-green-700">
                         Estimated Landed Cost
                       </p>
@@ -447,7 +668,6 @@ export default function PaymentsPage({ user }) {
                     STATUS SECTION
                 ================================================== */}
                 <div className="rounded-xl border border-gray-200 overflow-hidden mb-5">
-
                   <div className="px-4 py-3 bg-gray-50 border-b border-gray-200">
                     <p className="text-xs font-bold uppercase tracking-wide text-gray-600">
                       Procurement Status
@@ -455,7 +675,6 @@ export default function PaymentsPage({ user }) {
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 p-4">
-
                     <StatusBox
                       title="Payment"
                       value={order.paymentStatus}
@@ -467,9 +686,7 @@ export default function PaymentsPage({ user }) {
                         )
                       }
                       tone={
-                        order.paymentStatus === "Protected"
-                          ? "amber"
-                          : "green"
+                        order.paymentStatus === "Protected" ? "amber" : "green"
                       }
                     />
 
@@ -477,14 +694,26 @@ export default function PaymentsPage({ user }) {
                       title="Quality"
                       value={order.qualityStatus}
                       icon={<CheckCircle2 size={15} />}
-                      tone="green"
+                      tone={
+                        order.qualityStatus === "Verified"
+                          ? "green"
+                          : order.qualityStatus === "Rejected"
+                            ? "red"
+                            : "amber"
+                      }
                     />
 
                     <StatusBox
                       title="Quantity"
                       value={order.quantityStatus}
                       icon={<CheckCircle2 size={15} />}
-                      tone="green"
+                      tone={
+                        order.quantityStatus === "Verified"
+                          ? "green"
+                          : order.quantityStatus === "Rejected"
+                            ? "red"
+                            : "amber"
+                      }
                     />
 
                     <StatusBox
@@ -506,20 +735,15 @@ export default function PaymentsPage({ user }) {
                     TRANSPORT + DELIVERY SECTION
                 ================================================== */}
                 <div className="rounded-xl border border-gray-200 bg-white p-4 mb-5">
-
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-
                     {/* TRANSPORT */}
                     <div className="flex items-start gap-3">
-
                       <div className="h-9 w-9 shrink-0 rounded-lg bg-gray-50 border border-gray-200 flex items-center justify-center text-gray-600">
                         <Truck size={17} />
                       </div>
 
                       <div>
-                        <p className="text-xs text-gray-500">
-                          Transportation
-                        </p>
+                        <p className="text-xs text-gray-500">Transportation</p>
 
                         <p className="text-sm font-semibold text-gray-900 mt-0.5">
                           {order.transport}
@@ -536,7 +760,6 @@ export default function PaymentsPage({ user }) {
 
                     {/* DELIVERY */}
                     <div className="flex items-start gap-3 md:border-l md:border-gray-200 md:pl-4">
-
                       <div className="h-9 w-9 shrink-0 rounded-lg bg-gray-50 border border-gray-200 flex items-center justify-center text-gray-600">
                         <Clock3 size={17} />
                       </div>
@@ -547,7 +770,7 @@ export default function PaymentsPage({ user }) {
                         </p>
 
                         <p className="text-sm font-semibold text-gray-900 mt-0.5">
-                          {order.expectedDelivery}
+                          {formatDeliveryDate(order.expectedDelivery)}
                         </p>
 
                         <p className="text-xs text-gray-500 mt-0.5">
@@ -561,89 +784,263 @@ export default function PaymentsPage({ user }) {
                   </div>
                 </div>
 
-                {/* =================================================
-                    ACTIONS
-                ================================================== */}
-                <div className="flex flex-col sm:flex-row sm:justify-end gap-2 pt-1">
+                {/* ACTIONS */}
+                <div className="flex flex-col gap-3 pt-2">
+                  {/* Row 1: Order actions */}
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedOrder(order)}
+                      className="h-10 px-4 rounded-xl border border-gray-200 bg-white text-sm font-semibold text-gray-700 hover:bg-gray-50 flex items-center justify-center gap-2 transition-colors"
+                    >
+                      View Order
+                      <ArrowRight size={15} />
+                    </button>
 
-                  <button
-                    type="button"
-                    onClick={() => setSelectedOrder(order)}
-                    className="
-                      h-10
-                      px-4
-                      rounded-lg
-                      border
-                      border-gray-200
-                      bg-white
-                      text-sm
-                      font-semibold
-                      text-gray-700
-                      hover:bg-gray-50
-                      flex
-                      items-center
-                      justify-center
-                      gap-2
-                    "
-                  >
-                    View Order
-                    <ArrowRight size={15} />
-                  </button>
+                    <div className="flex flex-wrap items-center gap-2">
+                      {isDelivered && order.paymentStatus === "Released" && (
+                        <button
+                          type="button"
+                          className="h-10 px-4 rounded-xl border border-gray-200 bg-white text-sm font-semibold text-gray-700 hover:bg-gray-50 flex items-center justify-center gap-2"
+                        >
+                          <FileText size={15} />
+                          Receipt
+                        </button>
+                      )}
 
-                  {isDelivered &&
-                    order.paymentStatus === "Released" && (
                       <button
                         type="button"
-                        className="
-                          h-10
-                          px-4
-                          rounded-lg
-                          border
-                          border-gray-200
-                          bg-white
-                          text-sm
-                          font-semibold
-                          text-gray-700
-                          hover:bg-gray-50
-                          flex
-                          items-center
-                          justify-center
-                          gap-2
-                        "
+                        onClick={() => openQuestionModal(order)}
+                        className="h-10 px-4 rounded-xl border border-gray-200 bg-white text-sm font-semibold text-gray-700 hover:bg-gray-50 flex items-center justify-center gap-2"
                       >
-                        <FileText size={15} />
-                        Receipt
+                        <MessageCircle size={15} />
+                        Raise a Question
                       </button>
-                    )}
+                    </div>
+                  </div>
 
-                  <button
-                    type="button"
-                    onClick={() => openQuestionModal(order)}
-                    className="
-                      h-10
-                      px-4
-                      rounded-lg
-                      border
-                      border-gray-200
-                      bg-white
-                      text-sm
-                      font-semibold
-                      text-gray-700
-                      hover:bg-gray-50
-                      flex
-                      items-center
-                      justify-center
-                      gap-2
-                    "
-                  >
-                    <MessageCircle size={15} />
-                    Raise a Question
-                  </button>
+                  {/* Row 2: Quality and quantity verification */}
+
+                  {String(order.deliveryStatus || "").toLowerCase() ===
+                    "delivered" && (
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-4 rounded-xl border border-gray-100 bg-gray-50/70 p-4">
+                      {/* Quality verification */}
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="w-16 text-sm font-semibold text-gray-600">
+                          Quality
+                        </span>
+
+                        {order.qualityStatus === "Verified" ||
+                        order.qualityStatus === "Rejected" ? (
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span
+                              className={`rounded-lg px-3 py-2 text-sm font-semibold ${
+                                order.qualityStatus === "Verified"
+                                  ? "bg-emerald-100 text-emerald-700"
+                                  : "bg-red-100 text-red-700"
+                              }`}
+                            >
+                              {order.qualityStatus === "Verified"
+                                ? "✓ Verified"
+                                : "✕ Rejected"}
+                            </span>
+
+                            {order.qualityStatus === "Rejected" && (
+                              <span className="rounded-lg px-3 py-2 text-xs font-semibold bg-amber-100 text-amber-800">
+                                Review Required
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          <>
+                            <button
+                              type="button"
+                              disabled={Boolean(
+                                verificationLoading[
+                                  `${order.orderId}-qualityStatus`
+                                ],
+                              )}
+                              onClick={() =>
+                                updateVerification(
+                                  order,
+                                  "qualityStatus",
+                                  "approved",
+                                )
+                              }
+                              className="min-h-10 px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 transition-colors disabled:opacity-50"
+                            >
+                              {verificationLoading[
+                                `${order.orderId}-qualityStatus`
+                              ]
+                                ? "Saving..."
+                                : "Approve"}
+                            </button>
+
+                            <button
+                              type="button"
+                              disabled={Boolean(
+                                verificationLoading[
+                                  `${order.orderId}-qualityStatus`
+                                ],
+                              )}
+                              onClick={() =>
+                                updateVerification(
+                                  order,
+                                  "qualityStatus",
+                                  "rejected",
+                                )
+                              }
+                              className="min-h-10 px-4 py-2 rounded-lg border border-red-200 bg-white text-red-600 text-sm font-semibold hover:bg-red-50 transition-colors disabled:opacity-50"
+                            >
+                              Reject
+                            </button>
+                          </>
+                        )}
+                      </div>
+
+                      <div className="hidden sm:block w-px h-8 bg-gray-200" />
+
+                      {/* Quantity verification */}
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="w-16 text-sm font-semibold text-gray-600">
+                          Quantity
+                        </span>
+
+                        {order.quantityStatus === "Verified" ||
+                        order.quantityStatus === "Rejected" ? (
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span
+                              className={`rounded-lg px-3 py-2 text-sm font-semibold ${
+                                order.quantityStatus === "Verified"
+                                  ? "bg-emerald-100 text-emerald-700"
+                                  : "bg-red-100 text-red-700"
+                              }`}
+                            >
+                              {order.quantityStatus === "Verified"
+                                ? "✓ Verified"
+                                : "✕ Rejected"}
+                            </span>
+
+                            {order.quantityStatus === "Rejected" && (
+                              <span className="rounded-lg px-3 py-2 text-xs font-semibold bg-amber-100 text-amber-800">
+                                Review Required
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          <>
+                            <button
+                              type="button"
+                              disabled={Boolean(
+                                verificationLoading[
+                                  `${order.orderId}-quantityStatus`
+                                ],
+                              )}
+                              onClick={() =>
+                                updateVerification(
+                                  order,
+                                  "quantityStatus",
+                                  "approved",
+                                )
+                              }
+                              className="min-h-10 px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 transition-colors disabled:opacity-50"
+                            >
+                              {verificationLoading[
+                                `${order.orderId}-quantityStatus`
+                              ]
+                                ? "Saving..."
+                                : "Approve"}
+                            </button>
+
+                            <button
+                              type="button"
+                              disabled={Boolean(
+                                verificationLoading[
+                                  `${order.orderId}-quantityStatus`
+                                ],
+                              )}
+                              onClick={() =>
+                                updateVerification(
+                                  order,
+                                  "quantityStatus",
+                                  "rejected",
+                                )
+                              }
+                              className="min-h-10 px-4 py-2 rounded-lg border border-red-200 bg-white text-red-600 text-sm font-semibold hover:bg-red-50 transition-colors disabled:opacity-50"
+                            >
+                              Reject
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
           );
         })}
+
+        {/* SUBMITTED QUESTIONS */}
+        <div className="mt-8 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+          <div className="flex items-center gap-3 mb-5">
+            <div className="h-10 w-10 rounded-xl bg-green-50 flex items-center justify-center text-green-700">
+              <MessageCircle size={20} />
+            </div>
+            <div>
+              <h2 className="text-lg font-bold text-gray-900">My Questions</h2>
+              <p className="text-sm text-gray-500">
+                Track questions submitted about your orders.
+              </p>
+            </div>
+          </div>
+
+          {questionsLoading ? (
+            <p className="py-4 text-sm text-gray-500">
+              Loading your questions...
+            </p>
+          ) : questionsError ? (
+            <p className="py-4 text-sm text-red-600">{questionsError}</p>
+          ) : myQuestions.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-gray-300 p-6 text-center">
+              <MessageCircle className="mx-auto mb-2 text-gray-400" size={26} />
+              <p className="font-semibold text-gray-700">No questions yet</p>
+              <p className="mt-1 text-sm text-gray-500">
+                Use Raise a Question on an order to get started.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {myQuestions.map((question) => (
+                <div
+                  key={question._id || question.grievanceId}
+                  className="rounded-xl border border-gray-200 p-4"
+                >
+                  <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                    <div>
+                      <p className="font-semibold text-gray-900">
+                        {question.questionType}
+                      </p>
+                      <p className="mt-2 text-sm text-gray-700">
+                        {question.questionText}
+                      </p>
+                      <p className="mt-2 text-xs text-gray-500">
+                        Order ID: {question.orderId}
+                      </p>
+                      <p className="mt-1 text-xs text-gray-500">
+                        Reference: {question.grievanceId}
+                      </p>
+                    </div>
+
+                    <span className="w-fit rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold capitalize text-amber-700">
+                      {(question.status || "open").replace("_", " ")}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* =====================================================
@@ -651,12 +1048,9 @@ export default function PaymentsPage({ user }) {
       ====================================================== */}
       {selectedOrder && (
         <div className="fixed inset-0 z-[100] bg-black/40 flex items-center justify-center p-4">
-
           <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl">
-
             {/* HEADER */}
             <div className="px-5 py-4 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
-
               <div>
                 <h2 className="text-xl font-bold text-gray-900">
                   {selectedOrder.crop} Procurement
@@ -678,15 +1072,10 @@ export default function PaymentsPage({ user }) {
             </div>
 
             <div className="p-5 space-y-5">
-
               {/* SELLER + LOT */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-
                 <div className="rounded-xl border border-gray-200 p-4">
-
-                  <p className="text-xs text-gray-500">
-                    Seller
-                  </p>
+                  <p className="text-xs text-gray-500">Seller</p>
 
                   <p className="text-sm font-semibold text-gray-900 mt-1">
                     {selectedOrder.seller}
@@ -698,10 +1087,7 @@ export default function PaymentsPage({ user }) {
                 </div>
 
                 <div className="rounded-xl border border-gray-200 p-4">
-
-                  <p className="text-xs text-gray-500">
-                    Quantity & Quality
-                  </p>
+                  <p className="text-xs text-gray-500">Quantity & Quality</p>
 
                   <p className="text-sm font-semibold text-gray-900 mt-1">
                     {selectedOrder.quantity} Quintals
@@ -715,7 +1101,6 @@ export default function PaymentsPage({ user }) {
 
               {/* COST */}
               <div className="rounded-xl border border-gray-200 overflow-hidden">
-
                 <div className="px-4 py-3 bg-gray-50 border-b border-gray-200">
                   <p className="text-sm font-semibold text-gray-900">
                     Procurement Cost
@@ -723,7 +1108,6 @@ export default function PaymentsPage({ user }) {
                 </div>
 
                 <div className="p-4 space-y-3">
-
                   <CostRow
                     label="Produce Cost"
                     value={formatCurrency(selectedOrder.produceCost)}
@@ -735,22 +1119,18 @@ export default function PaymentsPage({ user }) {
                   />
 
                   <div className="border-t border-gray-100 pt-3 flex justify-between">
-
                     <span className="text-sm font-semibold text-gray-900">
                       Estimated Landed Cost
                     </span>
 
                     <span className="text-base font-bold text-green-700">
-                      {formatCurrency(
-                        getLandedCost(selectedOrder)
-                      )}
+                      {formatCurrency(getLandedCost(selectedOrder))}
                     </span>
                   </div>
 
                   <p className="text-right text-xs text-gray-500">
                     {formatCurrency(
-                      getLandedCost(selectedOrder) /
-                        selectedOrder.quantity
+                      getLandedCost(selectedOrder) / selectedOrder.quantity,
                     )}{" "}
                     / quintal
                   </p>
@@ -759,79 +1139,110 @@ export default function PaymentsPage({ user }) {
 
               {/* PROTECTION */}
               <div className="rounded-xl border border-green-200 bg-green-50 p-4">
-
                 <div className="flex items-start gap-3">
-
-                  <ShieldCheck
-                    size={20}
-                    className="text-green-600 mt-0.5"
-                  />
+                  <ShieldCheck size={20} className="text-green-600 mt-0.5" />
 
                   <div>
-
                     <p className="text-sm font-semibold text-green-800">
                       {selectedOrder.paymentStatus === "Protected"
                         ? "Payment is Protected"
-                        : "Payment Released"}
+                        : selectedOrder.paymentStatus === "Review Required"
+                          ? "Payment Review Required"
+                          : selectedOrder.paymentStatus === "Released"
+                            ? "Payment Released"
+                            : `Payment ${selectedOrder.paymentStatus}`}
                     </p>
 
                     <p className="text-xs text-green-700 mt-1 leading-5">
                       {selectedOrder.paymentStatus === "Protected"
                         ? "Payment remains protected while delivery and verification are completed."
-                        : "Payment was released after the procurement conditions were completed."}
+                        : selectedOrder.paymentStatus === "Review Required"
+                          ? "Payment cannot be released until the rejected verification is resolved."
+                          : selectedOrder.paymentStatus === "Released"
+                            ? "Payment was released after the procurement conditions were completed."
+                            : "Payment status is being reviewed."}
                     </p>
                   </div>
                 </div>
               </div>
 
               {/* STATUS FLOW */}
-              <div className="rounded-xl border border-gray-200 p-4">
 
+              {/* STATUS FLOW */}
+              <div className="rounded-xl border border-gray-200 p-4">
                 <p className="text-sm font-semibold text-gray-900 mb-4">
                   Procurement Status
                 </p>
 
                 <div className="space-y-3">
+                  {(() => {
+                    const quality = String(
+                      selectedOrder.qualityStatus || "",
+                    ).toLowerCase();
 
-                  <StatusStep
-                    title="Purchase Confirmed"
-                    completed
-                  />
+                    const quantity = String(
+                      selectedOrder.quantityStatus || "",
+                    ).toLowerCase();
 
-                  <StatusStep
-                    title="Payment Protected"
-                    completed
-                  />
+                    const delivery = String(
+                      selectedOrder.deliveryStatus || "",
+                    ).toLowerCase();
 
-                  <StatusStep
-                    title="Quality & Quantity Verified"
-                    completed
-                  />
+                    const verified =
+                      quality === "verified" && quantity === "verified";
 
-                  <StatusStep
-                    title="Transportation"
-                    completed
-                  />
+                    const rejected =
+                      quality === "rejected" || quantity === "rejected";
 
-                  <StatusStep
-                    title="Delivery"
-                    completed={
-                      selectedOrder.deliveryStatus === "Delivered"
-                    }
-                    active={
-                      selectedOrder.deliveryStatus === "In Transit"
-                    }
-                  />
+                    const delivered = delivery === "delivered";
 
-                  <StatusStep
-                    title="Payment Released"
-                    completed={
-                      selectedOrder.paymentStatus === "Released"
-                    }
-                    active={
-                      selectedOrder.paymentStatus === "Protected"
-                    }
-                  />
+                    const inTransit = [
+                      "in transit",
+                      "shipped",
+                      "out for delivery",
+                    ].includes(delivery);
+
+                    const reviewRequired =
+                      selectedOrder.paymentStatus === "Review Required";
+
+                    const released = selectedOrder.paymentStatus === "Released";
+
+                    return (
+                      <>
+                        <StatusStep title="Purchase Confirmed" completed />
+                        <StatusStep
+                          title="Payment Protected"
+                          completed={!released && !reviewRequired}
+                        />
+                        <StatusStep
+                          title={
+                            rejected
+                              ? "Quality & Quantity Review Required"
+                              : "Quality & Quantity Verified"
+                          }
+                          completed={verified && !rejected}
+                          active={rejected || (!verified && !rejected)}
+                        />
+
+                        <StatusStep
+                          title="Transportation"
+                          completed={inTransit || delivered}
+                          active={
+                            delivery === "pending" || delivery === "created"
+                          }
+                        />
+                        <StatusStep
+                          title="Delivery"
+                          completed={delivered}
+                          active={inTransit}
+                        />
+                        <StatusStep
+                          title="Payment Released"
+                          completed={released}
+                        />
+                      </>
+                    );
+                  })()}
                 </div>
               </div>
 
@@ -860,11 +1271,8 @@ export default function PaymentsPage({ user }) {
       ====================================================== */}
       {showQuestionModal && questionOrder && (
         <div className="fixed inset-0 z-[110] bg-black/40 flex items-center justify-center p-4">
-
           <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl">
-
             <div className="px-5 py-4 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
-
               <div>
                 <h2 className="text-xl font-bold text-gray-900">
                   Raise a Question
@@ -887,16 +1295,11 @@ export default function PaymentsPage({ user }) {
 
             {!questionSent ? (
               <div className="p-5">
-
                 <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 mb-5">
-
-                  <p className="text-xs text-gray-500">
-                    Procurement
-                  </p>
+                  <p className="text-xs text-gray-500">Procurement</p>
 
                   <p className="text-sm font-semibold text-gray-900 mt-1">
-                    {questionOrder.crop} •{" "}
-                    {questionOrder.quantity} Quintals
+                    {questionOrder.crop} • {questionOrder.quantity} Quintals
                   </p>
 
                   <p className="text-xs text-gray-500 mt-1">
@@ -958,39 +1361,42 @@ export default function PaymentsPage({ user }) {
                 />
 
                 <div className="mt-4 flex items-start gap-2 text-xs text-gray-500">
-
                   <AlertCircle size={15} className="mt-0.5 shrink-0" />
 
                   <p>
-                    Your question will be associated with this order
-                    and lot for easier resolution.
+                    Your question will be associated with this order and lot for
+                    easier resolution.
                   </p>
                 </div>
+
+                {questionError && (
+                  <p className="mt-3 text-sm text-red-600">{questionError}</p>
+                )}
 
                 <button
                   type="button"
                   onClick={submitQuestion}
-                  disabled={!questionText.trim()}
+                  disabled={!questionText.trim() || questionSubmitting}
                   className="
-                    w-full
-                    h-11
-                    mt-5
-                    rounded-xl
-                    bg-green-600
-                    text-white
-                    font-semibold
-                    hover:bg-green-700
-                    disabled:opacity-50
-                    disabled:cursor-not-allowed
-                  "
+                  h-11
+                  w-full
+                  rounded-xl
+                  mt-5
+                  text-white
+                  bg-green-600
+                  hover:bg-green-700
+                  font-semibold
+                  disabled:cursor-not-allowed
+                  disabled:opacity-50
+  "
                 >
-                  Submit Question
+                  {questionSubmitting ? "Submitting..." : "Submit Question"}
                 </button>
               </div>
             ) : (
               <div className="p-8 text-center">
-
-                <div className="
+                <div
+                  className="
                   h-14
                   w-14
                   mx-auto
@@ -1000,7 +1406,8 @@ export default function PaymentsPage({ user }) {
                   items-center
                   justify-center
                   text-green-600
-                ">
+                "
+                >
                   <CheckCircle2 size={30} />
                 </div>
 
@@ -1049,18 +1456,10 @@ export default function PaymentsPage({ user }) {
    SUMMARY CARD
 ========================================================= */
 
-function SummaryCard({
-  icon,
-  iconClass,
-  label,
-  value,
-  description,
-}) {
+function SummaryCard({ icon, iconClass, label, value, description }) {
   return (
     <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm">
-
       <div className="flex items-start gap-3">
-
         <div
           className={`
             h-10
@@ -1077,18 +1476,13 @@ function SummaryCard({
         </div>
 
         <div className="min-w-0">
-
-          <p className="text-xs text-gray-500">
-            {label}
-          </p>
+          <p className="text-xs text-gray-500">{label}</p>
 
           <p className="text-xl font-bold text-gray-900 mt-0.5 truncate">
             {value}
           </p>
 
-          <p className="text-[11px] text-gray-500 mt-1">
-            {description}
-          </p>
+          <p className="text-[11px] text-gray-500 mt-1">{description}</p>
         </div>
       </div>
     </div>
@@ -1099,12 +1493,7 @@ function SummaryCard({
    STATUS BOX
 ========================================================= */
 
-function StatusBox({
-  title,
-  value,
-  icon,
-  tone,
-}) {
+function StatusBox({ title, value, icon, tone }) {
   const styles = {
     green: {
       wrapper: "bg-green-50/70 border-green-100",
@@ -1134,9 +1523,7 @@ function StatusBox({
         ${current.wrapper}
       `}
     >
-      <p className="text-xs text-gray-500">
-        {title}
-      </p>
+      <p className="text-xs text-gray-500">{title}</p>
 
       <p
         className={`
@@ -1149,9 +1536,7 @@ function StatusBox({
           ${current.value}
         `}
       >
-        <span className={current.icon}>
-          {icon}
-        </span>
+        <span className={current.icon}>{icon}</span>
 
         {value}
       </p>
@@ -1166,14 +1551,9 @@ function StatusBox({
 function CostRow({ label, value }) {
   return (
     <div className="flex items-center justify-between text-sm">
+      <span className="text-gray-500">{label}</span>
 
-      <span className="text-gray-500">
-        {label}
-      </span>
-
-      <span className="font-medium text-gray-900">
-        {value}
-      </span>
+      <span className="font-medium text-gray-900">{value}</span>
     </div>
   );
 }
@@ -1182,14 +1562,9 @@ function CostRow({ label, value }) {
    STATUS STEP
 ========================================================= */
 
-function StatusStep({
-  title,
-  completed = false,
-  active = false,
-}) {
+function StatusStep({ title, completed = false, active = false }) {
   return (
     <div className="flex items-center gap-3">
-
       <div
         className={`
           h-7
@@ -1203,8 +1578,8 @@ function StatusStep({
             completed
               ? "bg-green-100 text-green-700"
               : active
-              ? "bg-blue-100 text-blue-700"
-              : "bg-gray-100 text-gray-400"
+                ? "bg-blue-100 text-blue-700"
+                : "bg-gray-100 text-gray-400"
           }
         `}
       >
@@ -1224,8 +1599,8 @@ function StatusStep({
             completed
               ? "font-semibold text-gray-900"
               : active
-              ? "font-semibold text-blue-700"
-              : "text-gray-400"
+                ? "font-semibold text-blue-700"
+                : "text-gray-400"
           }
         `}
       >
